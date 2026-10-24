@@ -1,0 +1,2212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SINGHS PUBLIC SCHOOL Report Card Generator & Master Grid</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- html2pdf.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- SheetJS CDN for Excel Exports -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+body, table, input, select, button {
+  font-family: Verdana, Geneva, sans-serif !important;
+}
+@media print {
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #pdf-preview, #pdf-preview * {
+    visibility: visible;
+  }
+  #pdf-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    height: 297mm;
+    margin: 0 !important;
+    padding: 30mm 10mm !important;
+    box-shadow: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+}
+.report-card-container {
+  width: 210mm;
+  height: 297mm;
+  padding: 30mm 10mm;
+  background: #fff;
+  margin: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+}
+.page-break {
+  page-break-after: always;
+  break-after: page;
+}
+</style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+<!-- LOGIN MODAL WRAPPER -->
+<div id="loginModal" class="fixed inset-0 bg-blue-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-lg shadow-2xl max-w-md w-full p-6 border-t-4 border-blue-900">
+    <div class="text-center mb-6">
+      <h2 class="text-xl font-bold text-blue-950">SINGHS PUBLIC SCHOOL</h2>
+      <p class="text-xs text-gray-500 mt-1">Academic Portal Login</p>
+    </div>
+    
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1">Email / Username</label>
+        <input type="text" id="loginEmail" placeholder="Enter your email" required class="w-full p-2.5 border border-gray-300 rounded text-xs font-medium focus:ring-2 focus:ring-blue-800 outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1">Password</label>
+        <input type="password" id="loginPassword" placeholder="Enter password" required class="w-full p-2.5 border border-gray-300 rounded text-xs font-medium focus:ring-2 focus:ring-blue-800 outline-none">
+      </div>
+      
+      <div id="loginError" class="text-red-600 text-xs font-semibold hidden bg-red-50 p-2 rounded border border-red-200 text-center">
+        Invalid email or password. Please try again.
+      </div>
+
+      <button type="submit" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded text-xs transition shadow">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<!-- OWNER ADMIN MANAGEMENT PANEL MODAL -->
+<div id="adminPanelModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center border-b pb-3 mb-4">
+      <div>
+        <h3 class="text-lg font-bold text-blue-950">Master Administration Panel</h3>
+        <p class="text-xs text-gray-500">Manage Classes, Students, Multi-Class/Multi-Subject Teacher Allotments & Batch Promotion</p>
+      </div>
+      <button onclick="closeAdminPanel()" class="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+    </div>
+
+    <!-- TABS MENU -->
+    <div class="flex border-b mb-4 gap-2 text-xs font-bold">
+      <button onclick="switchAdminTab('teachers')" id="tabBtnTeachers" class="px-4 py-2 border-b-2 border-blue-900 text-blue-900">Teacher Allotments & Multi-Class Permissions</button>
+      <button onclick="switchAdminTab('classes')" id="tabBtnClasses" class="px-4 py-2 border-b-2 border-transparent text-gray-500 hover:text-blue-900">Classes, Students & Batch Promotion</button>
+    </div>
+
+    <!-- TAB 1: TEACHER MANAGEMENT -->
+    <div id="adminTabTeachers">
+      <div class="bg-blue-50 border border-blue-200 p-4 rounded mb-6">
+        <h4 class="text-xs font-bold text-blue-950 mb-3 uppercase">Configure Teacher Profile & Multi-Class Access</h4>
+        <input type="hidden" id="editTeacherId" value="">
+        <div class="grid grid-cols-2 gap-3 text-xs mb-3">
+          <div>
+            <label class="block font-semibold mb-1">Teacher Name</label>
+            <input type="text" id="newTeacherName" placeholder="e.g. Mr. Rajesh Kumar" class="w-full p-1.5 border rounded bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Teacher Email</label>
+            <input type="email" id="newTeacherEmail" placeholder="rajesh@singhspublicschool.edu" class="w-full p-1.5 border rounded bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Password</label>
+            <input type="text" id="newTeacherPassword" placeholder="Teacher#1234" class="w-full p-1.5 border rounded bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Account Status</label>
+            <select id="newTeacherStatus" class="w-full p-1.5 border rounded bg-white font-medium">
+              <option value="active">Enabled (Active)</option>
+              <option value="disabled">Disabled (Blocked)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Class Teacher Designation (Single Class CT) -->
+        <div class="grid grid-cols-2 gap-3 text-xs mb-3 bg-white p-3 rounded border">
+          <div>
+            <label class="block font-bold text-blue-950 mb-1">Class Teacher Assignment (Optional - Max 1 Class)</label>
+            <select id="teacherCtClass" class="w-full p-1.5 border rounded bg-white font-bold">
+              <option value="">None (Subject Teacher Only)</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <p class="text-[10px] text-gray-500 pb-1">If designated as Class Teacher for a section, they have full editing rights for student profiles, attendance, and all subjects of that specific class.</p>
+          </div>
+        </div>
+
+        <!-- Multi-Class Teaching Allotment -->
+        <div class="mb-3 bg-white p-3 rounded border">
+          <label class="block font-bold text-blue-950 mb-1">Allotted Classes & Subjects (Teacher can teach across multiple classes):</label>
+          <p class="text-[10px] text-gray-500 mb-2">Check the classes and the exact subjects the teacher is authorized to edit across those classes.</p>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <span class="block font-semibold text-gray-700 mb-1 text-[11px]">Select Authorized Classes:</span>
+              <div id="teacherClassesCheckboxes" class="space-y-1 max-h-32 overflow-y-auto border p-2 rounded bg-gray-50"></div>
+            </div>
+            <div>
+              <span class="block font-semibold text-gray-700 mb-1 text-[11px]">Select Authorized Subjects:</span>
+              <div class="flex flex-col gap-1 max-h-32 overflow-y-auto border p-2 rounded bg-gray-50" id="subjectAllotmentCheckboxes">
+                <label class="inline-flex items-center gap-1"><input type="checkbox" value="English" checked class="sub-check"> English</label>
+                <label class="inline-flex items-center gap-1"><input type="checkbox" value="Hindi" checked class="sub-check"> Hindi</label>
+                <label class="inline-flex items-center gap-1"><input type="checkbox" value="Mathematics" checked class="sub-check"> Mathematics</label>
+                <label class="inline-flex items-center gap-1"><input type="checkbox" value="Science" checked class="sub-check"> Science</label>
+                <label class="inline-flex items-center gap-1"><input type="checkbox" value="Social Science" checked class="sub-check"> Social Science</label>
+                <label class="inline-flex items-center gap-1"><input type="checkbox" value="Punjabi" checked class="sub-check"> Punjabi</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button onclick="saveTeacherAccount()" class="bg-blue-900 hover:bg-blue-800 text-white px-4 py-2 rounded text-xs font-bold" id="btnSaveTeacher">Save Teacher Profile</button>
+          <button onclick="resetTeacherForm()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded text-xs font-bold hidden" id="btnCancelEdit">Cancel</button>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="text-xs font-bold text-gray-700 mb-2 uppercase">Configured Teacher Accounts</h4>
+        <div class="overflow-x-auto border rounded">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-gray-100 text-gray-700 border-b">
+              <tr>
+                <th class="p-2 border-r">Teacher Name</th>
+                <th class="p-2 border-r">Email & Password</th>
+                <th class="p-2 border-r text-center">Class Teacher Assignment</th>
+                <th class="p-2 border-r">Allotted Classes & Subjects</th>
+                <th class="p-2 text-center">Action / Transfer</th>
+              </tr>
+            </thead>
+            <tbody id="teacherAccountsTable" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: CLASS, STUDENT ROSTER & BATCH PROMOTION -->
+    <div id="adminTabClasses" class="hidden">
+      <!-- Batch & Promotion Management -->
+      <div class="bg-purple-50 border border-purple-200 p-4 rounded mb-6">
+        <h4 class="text-xs font-bold text-purple-950 mb-2 uppercase">Batch & Academic Session Management</h4>
+        <p class="text-[11px] text-gray-600 mb-3">Change current operational batch session or promote/transfer student rosters to a new academic year.</p>
+        
+        <div class="grid grid-cols-2 gap-4 text-xs">
+          <div class="bg-white p-3 rounded border">
+            <label class="block font-bold text-purple-950 mb-1">Switch Active Operational Batch</label>
+            <div class="flex gap-2">
+              <input type="text" id="activeBatchInput" value="2026-27" class="p-1.5 border rounded w-2/3 font-bold">
+              <button onclick="updateActiveBatch()" class="bg-purple-800 hover:bg-purple-900 text-white px-3 py-1.5 rounded font-bold">Set Batch</button>
+            </div>
+          </div>
+          <div class="bg-white p-3 rounded border">
+            <label class="block font-bold text-purple-950 mb-1">Promote Class Roster to New Batch</label>
+            <div class="flex gap-2">
+              <select id="promoteSourceClass" class="p-1.5 border rounded w-1/3 font-bold"></select>
+              <input type="text" id="targetBatchInput" placeholder="2027-28" class="p-1.5 border rounded w-1/3 font-bold">
+              <input type="text" id="targetPromotedClass" placeholder="Target class e.g. IX A" class="p-1.5 border rounded w-1/3 font-bold">
+              <button onclick="promoteClassBatch()" class="bg-indigo-700 hover:bg-indigo-800 text-white px-3 py-1.5 rounded font-bold">Promote</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create Class Section -->
+      <div class="bg-amber-50 border border-amber-200 p-4 rounded mb-6">
+        <h4 class="text-xs font-bold text-amber-950 mb-2 uppercase">Add New Class / Section</h4>
+        <div class="flex gap-2 text-xs">
+          <input type="text" id="newClassName" placeholder="e.g. IX C or VIII B" class="p-2 border rounded w-1/3 bg-white font-bold">
+          <button onclick="addNewClass()" class="bg-amber-700 hover:bg-amber-800 text-white px-4 py-2 rounded font-bold">Add Class</button>
+        </div>
+      </div>
+
+
+      <!-- Class transfer and safe removal -->
+      <div class="bg-indigo-50 border border-indigo-200 p-4 rounded mb-6">
+        <h4 class="text-xs font-bold text-indigo-950 mb-2 uppercase">Class Transfers & Safe Class Removal</h4>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <div><label class="block font-semibold mb-1">Move all students from</label><select id="bulkMoveSource" class="w-full p-2 border rounded bg-white"></select></div>
+          <div><label class="block font-semibold mb-1">Move all students to</label><select id="bulkMoveTarget" class="w-full p-2 border rounded bg-white"></select></div>
+          <div class="flex items-end"><button onclick="moveWholeClass()" class="w-full bg-indigo-700 text-white p-2 rounded font-bold">Move Entire Class</button></div>
+          <div><label class="block font-semibold mb-1">Remove empty class</label><select id="removeClassSelect" class="w-full p-2 border rounded bg-white"></select></div>
+          <div class="col-span-2 flex items-end"><button onclick="removeClassSafely()" class="bg-red-700 text-white p-2 rounded font-bold">Remove Selected Class (only if empty)</button></div>
+        </div>
+      </div>
+
+      <!-- Subject management -->
+      <div class="bg-sky-50 border border-sky-200 p-4 rounded mb-6">
+        <h4 class="text-xs font-bold text-sky-950 mb-2 uppercase">Subject Management</h4>
+        <div class="flex gap-2 text-xs">
+          <input id="newSubjectName" type="text" placeholder="New subject name" class="p-2 border rounded flex-1 bg-white">
+          <button onclick="addSubject()" class="bg-sky-800 text-white px-4 py-2 rounded font-bold">Add Subject</button>
+          <select id="removeSubjectSelect" class="p-2 border rounded bg-white"></select>
+          <button onclick="removeSubject()" class="bg-red-700 text-white px-3 py-2 rounded font-bold">Remove Subject</button>
+        </div>
+      </div>
+
+      <!-- Assessment configuration -->
+      <div class="bg-teal-50 border border-teal-200 p-4 rounded mb-6">
+        <h4 class="text-xs font-bold text-teal-950 mb-2 uppercase">Assessment Components & Marks Settings</h4>
+        <p class="text-[10px] text-gray-600 mb-2">Set maximum marks and whether each internal component is required. Changes apply to the report card and Master Grid totals.</p>
+        <div id="assessmentSettings" class="grid grid-cols-2 gap-2 text-xs"></div>
+        <label class="inline-flex items-center gap-2 mt-3 text-xs font-semibold"><input type="checkbox" id="compressMarksToggle" onchange="saveAssessmentSettings(); renderMasterGrid(); updatePreview();"> Normalize/convert entered marks to configured component maximums</label>
+        <button onclick="saveAssessmentSettings()" class="ml-3 bg-teal-800 text-white px-3 py-1.5 rounded font-bold text-xs">Save Assessment Settings</button>
+      </div>
+
+      <!-- Add Student Section -->
+      <div class="bg-green-50 border border-green-200 p-4 rounded mb-6">
+        <h4 class="text-xs font-bold text-green-950 mb-3 uppercase">Add Student to Roster</h4>
+        <div class="grid grid-cols-3 gap-3 text-xs mb-3">
+          <div>
+            <label class="block font-semibold mb-1">Target Class / Section</label>
+            <select id="selStudentClass" class="w-full p-1.5 border rounded bg-white font-bold"></select>
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Student Name</label>
+            <input type="text" id="newStName" placeholder="e.g. Gurpreet Singh" class="w-full p-1.5 border rounded bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Roll No.</label>
+            <input type="number" id="newStRoll" placeholder="1" class="w-full p-1.5 border rounded bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Admission No.</label>
+            <input type="number" id="newStAdmn" placeholder="2301" class="w-full p-1.5 border rounded bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Date of Birth (DOB)</label>
+            <input type="text" id="newStDob" placeholder="DD-MM-YYYY" class="w-full p-1.5 border rounded bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Father's Name</label>
+            <input type="text" id="newStFather" placeholder="Father's Name" class="w-full p-1.5 border rounded bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Mother's Name</label>
+            <input type="text" id="newStMother" placeholder="Mother's Name" class="w-full p-1.5 border rounded bg-white">
+          </div>
+        </div>
+        <button onclick="addNewStudent()" class="bg-green-800 hover:bg-green-900 text-white px-4 py-2 rounded text-xs font-bold">Add Student to Class</button>
+      </div>
+
+      <!-- Student List Preview -->
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="text-xs font-bold text-gray-700 uppercase">Current Roster View by Class:</h4>
+          <select id="filterRosterClass" onchange="renderRosterTable()" class="text-xs p-1 border rounded bg-white font-bold"></select>
+        </div>
+        <div class="overflow-x-auto border rounded">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-gray-100 text-gray-700 border-b">
+              <tr>
+                <th class="p-2 border-r">Class</th>
+                <th class="p-2 border-r">Roll</th>
+                <th class="p-2 border-r">Admn No</th>
+                <th class="p-2 border-r">Student Name</th>
+                <th class="p-2 border-r">DOB</th>
+                <th class="p-2 border-r">Father Name</th>
+                <th class="p-2 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="rosterTableBody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<header class="bg-blue-900 text-white p-4 shadow-md flex justify-between items-center">
+  <div class="flex items-center gap-3">
+    <div>
+      <h1 class="text-lg font-bold">SINGHS PUBLIC SCHOOL</h1>
+      <p class="text-xs text-blue-200">Report Card Generator & Master Grid | Batch <span id="headerBatchDisplay">2026-27</span></p>
+    </div>
+  </div>
+  
+  <div class="flex items-center gap-2">
+    <div id="userBadge" class="bg-blue-950 px-3 py-1 rounded border border-blue-700 text-xs flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+      <span id="userBadgeText" class="font-bold">Not Logged In</span>
+    </div>
+
+    <!-- Batch Selector Dropdown for Viewing Historical Records -->
+    <div class="bg-blue-950 px-2 py-1 rounded border border-blue-700 text-xs flex items-center gap-1">
+      <span class="text-blue-300 font-semibold">Batch:</span>
+      <select id="globalBatchSelector" onchange="onGlobalBatchChange()" class="bg-blue-900 text-white font-bold p-0.5 border-0 outline-none text-xs rounded cursor-pointer">
+        <option value="2026-27">2026-27</option>
+      </select>
+    </div>
+    
+    <button id="btnAdminPanel" onclick="openAdminPanel()" class="bg-amber-600 hover:bg-amber-700 px-3 py-2 text-xs rounded font-bold shadow transition text-white hidden">Master Panel</button>
+    <button onclick="switchView('reportCard')" id="btnViewReport" class="bg-blue-700 hover:bg-blue-800 px-3 py-2 text-xs rounded font-bold shadow transition border border-blue-400">Report Card Editor</button>
+    <button onclick="switchView('masterGrid')" id="btnViewMaster" class="bg-blue-800 hover:bg-blue-700 px-3 py-2 text-xs rounded font-semibold shadow transition text-blue-200">Subject Master Grid (.xlsx)</button>
+    <button onclick="saveToLocalStorage()" class="bg-green-600 hover:bg-green-700 px-3 py-2 text-xs rounded font-bold shadow transition flex items-center gap-1">Save Student</button>
+    <button onclick="window.print()" class="bg-teal-600 hover:bg-teal-700 px-3 py-2 text-xs rounded font-bold shadow transition flex items-center gap-1" title="Print/Save as native Vector PDF">Native Vector PDF</button>
+    <button onclick="generatePDF()" class="bg-yellow-600 hover:bg-yellow-700 px-3 py-2 text-xs rounded font-bold shadow transition flex items-center gap-1">Export HD Canvas PDF</button>
+    <button onclick="generateAllPDFs()" class="bg-purple-600 hover:bg-purple-700 px-3 py-2 text-xs rounded font-bold shadow transition flex items-center gap-1" id="btnDownloadAll">Download All (1 File)</button>
+    <button onclick="handleLogout()" class="bg-red-700 hover:bg-red-800 px-2.5 py-2 text-xs rounded font-bold shadow transition">Logout</button>
+  </div>
+</header>
+
+<!-- ==================== VIEW 1: REPORT CARD GENERATOR ==================== -->
+<div id="reportCardView" class="flex flex-col lg:flex-row min-h-[calc(100vh-64px)]">
+  <!-- INPUT FORM PANEL -->
+  <div class="w-full lg:w-1/2 p-5 bg-white shadow-md overflow-y-auto max-h-[calc(100vh-64px)]">
+    <!-- Class & Student Roster Selector -->
+    <div class="bg-blue-50 border border-blue-200 p-3 rounded mb-4">
+      <label class="block text-xs font-bold text-blue-900 mb-1">Select Class & Student:</label>
+      <div class="flex gap-2">
+        <select id="classSelector" onchange="onClassChange()" class="w-1/3 p-2 border border-blue-400 rounded bg-white text-xs font-bold text-gray-800"></select>
+        <select id="studentRoster" onchange="onStudentSelectChange()" class="w-2/3 p-2 border border-blue-400 rounded bg-white text-xs font-bold text-gray-800"></select>
+      </div>
+      <div class="flex justify-between items-center mt-2">
+        <span class="text-[10px] text-gray-500" id="rosterCountText">0 Students Loaded</span>
+        <span id="saveNotice" class="text-xs font-bold text-green-700 hidden">Saved!</span>
+      </div>
+    </div>
+    
+    <form id="erpForm" class="space-y-4">
+      <!-- Report Card Type Selector -->
+      <fieldset class="border p-3 rounded border-gray-300 bg-gray-50">
+        <legend class="font-bold text-blue-900 px-2 text-xs">Report Card Type</legend>
+        <div class="space-y-2 text-xs">
+          <div class="flex items-center gap-2">
+            <input type="radio" id="reportTypeTerm1" name="reportType" value="Term1" checked onchange="updatePreview()">
+            <label for="reportTypeTerm1" class="font-bold text-gray-800 cursor-pointer">Progress Report (Term-I)</label>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="radio" id="reportTypeTerm2" name="reportType" value="Term2" onchange="updatePreview()">
+            <label for="reportTypeTerm2" class="font-bold text-gray-800 cursor-pointer flex items-center gap-2">
+              Annual Report Card (Term-II)
+              <span class="text-gray-500 font-normal">Year:</span>
+              <input type="text" id="annualYearInput" value="2026-27" class="w-20 p-1 border rounded text-xs text-center font-bold" oninput="updatePreview()">
+            </label>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Basic Info -->
+      <fieldset class="border p-3 rounded border-gray-300">
+        <legend class="font-bold text-blue-900 px-2 text-xs">Student Profile</legend>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label class="block font-semibold mb-1">Student's Name</label>
+            <input type="text" id="studentName" class="w-full p-1.5 border rounded">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Father's Name</label>
+            <input type="text" id="fatherName" class="w-full p-1.5 border rounded">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Roll No.</label>
+            <input type="text" id="rollNo" class="w-full p-1.5 border rounded">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Class Section</label>
+            <input type="text" id="classSection" value="VIII A" class="w-full p-1.5 border rounded">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1 text-blue-900">Date of Birth (DOB)</label>
+            <input type="text" id="dob" class="w-full p-1.5 border border-blue-400 rounded font-semibold bg-blue-50" placeholder="DD-MM-YYYY">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Mother's Name</label>
+            <input type="text" id="motherName" class="w-full p-1.5 border rounded">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Admission No.</label>
+            <input type="text" id="admissionNo" class="w-full p-1.5 border rounded bg-gray-50">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1">Session</label>
+            <input type="text" id="academicSession" value="2026-27" class="w-full p-1.5 border rounded">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Marks Input -->
+      <fieldset class="border p-3 rounded border-gray-300">
+        <legend class="font-bold text-blue-900 px-2 text-xs">Scholastic Areas Marks & Status (PT & Term End)</legend>
+        <p class="text-[10px] text-gray-500 mb-2">Subject teachers can edit only their authorized subjects across allotted classes. Unauthorized subjects are securely locked.</p>
+        <div id="subjectsContainer" class="space-y-3"></div>
+      </fieldset>
+
+      <!-- Co-Scholastic & Attendance -->
+      <fieldset class="border p-3 rounded border-gray-300">
+        <legend class="font-bold text-blue-900 px-2 text-xs">Co-Scholastic Areas & Attendance</legend>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label class="font-semibold">Health/Physical Education</label>
+            <input type="text" class="co-grade w-full p-1 border rounded" data-activity="Health/Physical Education" value="A">
+          </div>
+          <div>
+            <label class="font-semibold">Art And Craft</label>
+            <input type="text" class="co-grade w-full p-1 border rounded" data-activity="Art And Craft" value="A">
+          </div>
+          <div>
+            <label class="font-semibold">Social and Emotional skills</label>
+            <input type="text" class="co-grade w-full p-1 border rounded" data-activity="Social and Emotional skills" value="A">
+          </div>
+          <div>
+            <label class="font-semibold">Visual and performing Arts</label>
+            <input type="text" class="co-grade w-full p-1 border rounded" data-activity="Visual and performing Arts" value="A">
+          </div>
+          <div>
+            <label class="font-semibold">Club</label>
+            <input type="text" class="co-grade w-full p-1 border rounded" data-activity="Club" value="A">
+          </div>
+          <div>
+            <label class="font-semibold">Computers</label>
+            <input type="text" class="co-grade w-full p-1 border rounded" data-activity="Computers" value="A">
+          </div>
+          <div class="col-span-2">
+            <label class="font-semibold">Attendance %</label>
+            <input type="text" id="attendancePct" value="0%" class="w-full p-1 border rounded">
+          </div>
+          <div class="col-span-2">
+            <label class="font-semibold">Remarks</label>
+            <input type="text" id="remarksInput" value="" class="w-full p-1 border rounded" placeholder="Enter teacher remarks...">
+          </div>
+          <div class="col-span-2">
+            <label class="font-semibold">Report Date</label>
+            <input type="text" id="reportDate" value="" class="w-full p-1 border rounded" placeholder="e.g. MARCH, 2026 or leave blank">
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="flex gap-2">
+        <button type="button" onclick="saveToLocalStorage()" class="w-1/3 py-2.5 bg-green-700 text-white text-xs font-bold rounded shadow hover:bg-green-800">Save</button>
+        <button type="button" onclick="generatePDF()" class="w-1/3 py-2.5 bg-blue-800 text-white text-xs font-bold rounded shadow hover:bg-blue-900">Single HD PDF</button>
+        <button type="button" onclick="generateAllPDFs()" class="w-1/3 py-2.5 bg-purple-700 text-white text-xs font-bold rounded shadow hover:bg-purple-800">Download All</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- PREVIEW PANEL -->
+  <div class="w-full lg:w-1/2 p-5 bg-gray-300 overflow-y-auto max-h-[calc(100vh-64px)] flex justify-center">
+    <div id="pdf-preview" class="report-card-container border border-gray-400 text-xs shadow-lg text-black flex flex-col justify-between">
+      <div>
+        <!-- Title Header -->
+        <div class="text-center font-bold text-sm mb-2 leading-tight">
+          <div id="lblHeaderTitle">PROGRESS REPORT: 2026-27</div>
+          <div id="lblHeaderSubTitle">TERM-I</div>
+        </div>
+        <!-- Student Details Block -->
+        <div class="grid grid-cols-2 gap-x-6 mb-2 text-[11px] leading-tight font-bold">
+          <div>
+            <p><span class="w-28 inline-block">Student's Name</span> <span id="lblStudentName" class="font-normal"></span></p>
+            <p><span class="w-28 inline-block">Roll No.</span> <span id="lblRollNo" class="font-normal"></span></p>
+            <p><span class="w-28 inline-block">Date of Birth</span> <span id="lblDOB" class="font-normal"></span></p>
+            <p><span class="w-28 inline-block">Admission No.</span> <span id="lblAdmissionNo" class="font-normal"></span></p>
+          </div>
+          <div>
+            <p><span class="w-24 inline-block">Father's Name</span> <span id="lblFatherName" class="font-normal"></span></p>
+            <p><span class="w-24 inline-block">Class Section</span> <span id="lblClassSection" class="font-normal"></span></p>
+            <p><span class="w-24 inline-block">Mother's Name</span> <span id="lblMotherName" class="font-normal"></span></p>
+          </div>
+        </div>
+        <!-- Scholastic Areas Table Structure -->
+        <table class="w-full border-collapse border border-black text-center text-[10px] mb-2 relative z-10 bg-transparent">
+          <thead>
+            <tr class="border-b border-black font-bold">
+              <th id="lblScholasticAreaSpan" colspan="8" class="border border-black px-1 py-0.5 text-center">Scholastic Areas</th>
+              <th rowspan="4" id="lblTermColumnHeader" class="border border-black px-1 py-0.5 w-10 align-middle">Term-1<br><br>(100)</th>
+              <th rowspan="4" class="border border-black px-1 py-0.5 w-10 align-middle">Grade</th>
+            </tr>
+            <tr class="border-b border-black font-bold">
+              <th rowspan="3" class="border border-black px-1 py-0.5 w-24 text-left align-middle">SUBJECTS</th>
+              <th colspan="6" class="border border-black px-1 py-0.5 text-center">Internal Assessment</th>
+              <th rowspan="3" id="lblTermEndHeader" class="border border-black px-1 py-0.5 text-center align-middle">Term<br>End-1<br><br>(70)</th>
+            </tr>
+            <tr class="border-b border-black font-bold text-[9px]" id="scholasticSubHeaderRow">
+              <th class="border border-black px-1 py-0.5">Attendance</th>
+              <th class="border border-black px-1 py-0.5">Subject<br>Enrichment</th>
+              <th class="border border-black px-1 py-0.5">Project<br>Based<br>Activities</th>
+              <th class="border border-black px-1 py-0.5">Portfolio</th>
+              <th class="border border-black px-1 py-0.5">Multiple<br>Assessment</th>
+              <th id="lblPtSubHeader" class="border border-black px-1 py-0.5">P.T-1<br>(max 5)</th>
+            </tr>
+            <tr class="border-b border-black font-bold text-[9px]" id="scholasticMaxMarksRow">
+              <th class="border border-black px-1 py-0.5">(5)</th>
+              <th class="border border-black px-1 py-0.5">(5)</th>
+              <th class="border border-black px-1 py-0.5">(5)</th>
+              <th class="border border-black px-1 py-0.5">(5)</th>
+              <th class="border border-black px-1 py-0.5">(5)</th>
+              <th class="border border-black px-1 py-0.5">(5)</th>
+            </tr>
+          </thead>
+          <tbody id="scholasticTableBody"></tbody>
+          <tfoot>
+            <tr class="font-bold border-t border-black text-[10px]">
+              <td colspan="5" class="border border-black text-left px-1 py-0.5">GRAND TOTAL: <span id="lblGrandTotal"></span></td>
+              <td colspan="5" class="border border-black text-left px-1 py-0.5">TOTAL PERCENTAGE: <span id="lblPercentage"></span></td>
+            </tr>
+          </tfoot>
+        </table>
+        <!-- Co-Scholastic & Attendance Block -->
+        <div class="border border-black mb-2 text-[10px] relative z-10 bg-transparent">
+          <div class="flex">
+            <div class="w-3/4 border-r border-black">
+              <div class="flex border-b border-black font-bold px-1 py-0.5">
+                <div class="w-3/4">Co-Scholastic Areas [On a 3-point (A-C) Grading scale]</div>
+                <div class="w-1/4 text-center">Grade</div>
+              </div>
+              <div id="coScholasticRows"></div>
+            </div>
+            <div class="w-1/4 flex flex-col justify-start">
+              <div class="border-b border-black font-bold px-1 py-0.5 text-center">Attendance %</div>
+              <div class="flex-grow flex items-center justify-center font-bold text-xs px-1 py-0.5" id="lblAttendance">0%</div>
+            </div>
+          </div>
+          <div class="border-t border-black px-1 py-0.5">
+            <div class="py-0.5 px-1"><strong>Remarks:</strong> <span id="lblRemarks" class="font-normal"></span></div>
+          </div>
+        </div>
+
+        <!-- Grading Scales -->
+        <div class="grid grid-cols-2 gap-2 mb-2 relative z-10 bg-transparent">
+          <div>
+            <table class="w-full border-collapse border border-black text-[9.5px]">
+              <thead>
+                <tr class="border-b border-black font-bold">
+                  <th colspan="2" class="border border-black px-1 py-0.5 text-left">Grading Scale for Scholastic Areas:</th>
+                </tr>
+                <tr class="border-b border-black font-bold text-center">
+                  <th class="border border-black px-1 py-0.5 w-1/2 underline">Marks</th>
+                  <th class="border border-black px-1 py-0.5 w-1/2 underline">Grade</th>
+                </tr>
+              </thead>
+              <tbody class="text-center font-semibold">
+                <tr><td class="border border-black px-1 py-0.5">91-100</td><td class="border border-black px-1 py-0.5">A1</td></tr>
+                <tr><td class="border border-black px-1 py-0.5">81-90</td><td class="border border-black px-1 py-0.5">A2</td></tr>
+                <tr><td class="border border-black px-1 py-0.5">71-80</td><td class="border border-black px-1 py-0.5">B1</td></tr>
+                <tr><td class="border border-black px-1 py-0.5">61-70</td><td class="border border-black px-1 py-0.5">B2</td></tr>
+                <tr><td class="border border-black px-1 py-0.5">51-60</td><td class="border border-black px-1 py-0.5">C1</td></tr>
+                <tr><td class="border border-black px-1 py-0.5">41-50</td><td class="border border-black px-1 py-0.5">C2</td></tr>
+                <tr><td class="border border-black px-1 py-0.5">33-40</td><td class="border border-black px-1 py-0.5">D</td></tr>
+                <tr><td class="border border-black px-1 py-0.5">32 and below</td><td class="border border-black px-1 py-0.5">E (NEEDS IMPROVEMENT)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <table class="w-full border-collapse border border-black text-[9.5px]">
+              <thead>
+                <tr class="border-b border-black font-bold">
+                  <th colspan="2" class="border border-black px-1 py-0.5 text-left">Grading Scale for Co-Scholastic Areas:</th>
+                </tr>
+              </thead>
+              <tbody class="text-left font-semibold">
+                <tr>
+                  <td class="border border-black px-1 py-0.5 font-bold text-center w-6">A</td>
+                  <td class="border border-black px-1 py-0.5">Excellent!</td>
+                </tr>
+                <tr>
+                  <td class="border border-black px-1 py-0.5 font-bold text-center w-6">B</td>
+                  <td class="border border-black px-1 py-0.5">Very Good</td>
+                </tr>
+                <tr>
+                  <td class="border border-black px-1 py-0.5 font-bold text-center w-6">C</td>
+                  <td class="border border-black px-1 py-0.5">Good/Need To Improve</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- Date & Signatures Block with Direct Base64 Embedded Signature -->
+      <div class="text-[10px] relative z-10 pt-1 pb-1">
+        <p class="mb-1 font-bold">DATE: <span id="lblReportDate"></span></p>
+        <div class="flex justify-between text-center font-bold items-end pt-2">
+          <div class="border-t border-black w-1/4 pt-1 relative">
+            <div class="absolute -top-12 left-1/2 -translate-x-1/2 pointer-events-none">
+              <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" data-fallback="https://i.ibb.co/68v8z0x/signature.png" alt="Signature" class="h-12 w-auto mx-auto object-contain opacity-90" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.removeAttribute('data-fallback');}">
+            </div>
+            CLASS TEACHER
+          </div>
+          <div class="border-t border-black w-1/4 pt-1">VICE PRINCIPAL</div>
+          <div class="border-t border-black w-1/4 pt-1">PRINCIPAL</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== VIEW 2: SUBJECT-WISE MASTER GRID & EXCEL EXPORT ==================== -->
+<div id="masterGridView" class="max-w-7xl mx-auto p-4 hidden">
+  <div class="bg-white p-6 shadow-md rounded-lg">
+    <div class="flex justify-between items-center mb-4 border-b pb-4">
+      <div>
+        <h2 class="text-xl font-bold text-blue-900">Class Subject-Wise Master Grid</h2>
+        <p class="text-sm text-gray-500">Edit individual student marks per subject across the entire class with automated averages and spreadsheet export.</p>
+      </div>
+      <div class="flex gap-3 items-center">
+        <select id="masterSubjectSelect" onchange="renderMasterGrid()" class="border border-gray-300 rounded px-3 py-1.5 font-medium text-sm bg-gray-50">
+        </select>
+        <button onclick="exportMasterGridToExcel()" class="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-green-700 transition flex items-center gap-1.5">
+          Export Formatted Excel (.xlsx)
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto border border-gray-200 rounded">
+      <table id="masterGridTable" class="w-full border-collapse text-left text-xs">
+        <thead class="bg-blue-50 text-blue-900 uppercase font-bold">
+          <tr id="masterGridHeaderRow">
+            <th class="border px-3 py-2">Roll No</th>
+            <th class="border px-3 py-2">Admission No</th>
+            <th class="border px-3 py-2">Student Name</th>
+            <th class="border px-3 py-2 text-center">Attendance (5)</th>
+            <th class="border px-3 py-2 text-center">Sub Enrich (5)</th>
+            <th class="border px-3 py-2 text-center">Project (5)</th>
+            <th class="border px-3 py-2 text-center">Portfolio (5)</th>
+            <th class="border px-3 py-2 text-center">Multi Assess (5)</th>
+            <th class="border px-3 py-2 text-center" id="masterGridPtLabel">P.T (Out of 40)</th>
+            <th class="border px-3 py-2 text-center" id="masterGridTermLabel">Term Exam (Out of 80)</th>
+            <th class="border px-3 py-2 text-center font-bold bg-blue-100">Subject Total</th>
+            <th class="border px-3 py-2 text-center font-bold bg-blue-100">Grade</th>
+          </tr>
+        </thead>
+        <tbody id="masterGridBody" class="divide-y divide-gray-200">
+        </tbody>
+        <tfoot class="bg-gray-50 font-bold text-gray-800">
+          <tr id="masterGridFooter">
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const defaultClasses = ["VIII A", "IX C"];
+let currentBatch = "2026-27";
+
+function getStoredBatches() {
+  const b = localStorage.getItem('singhs_batches_v1');
+  return b ? JSON.parse(b) : ["2026-27"];
+}
+
+function getStoredClasses() {
+  const c = localStorage.getItem(`singhs_classes_${currentBatch}`);
+  return c ? JSON.parse(c) : defaultClasses;
+}
+
+function getStoredStudents() {
+  const s = localStorage.getItem(`singhs_students_${currentBatch}`);
+  if (!s) {
+    const initialStudents = {
+      "VIII A": [
+        { roll: 1, name: "Jaideep Singh Bhatia", admn: 2235, father: "Dharambir Singh", mother: "Harbir Kaur Bhatia", dob: "10-04-2012" },
+        { roll: 2, name: "Jasleen Kaur Bhatia", admn: 2236, father: "Harvinder Singh Babbar", mother: "Avinash Kaur", dob: "11-12-1985" },
+        { roll: 3, name: "Harbir Kaur Bhatia", admn: 2237, father: "Dilbagh Singh", mother: "Surinder Kaur", dob: "31-3-1956" },
+        { roll: 4, name: "Kawardeep Kaur", admn: 2238, father: "Dharambir Singh", mother: "Harbir Kaur Bhatia", dob: "17-4-1984" },
+        { roll: 5, name: "Sohila Kaur Sethi", admn: 2239, father: "Gurjyote Singh", mother: "Kawardeep Kaur", dob: "9-1-2006" },
+        { roll: 6, name: "Rabani Kaur Sethi", admn: 2240, father: "Gurjyote Singh", mother: "Kawardeep Kaur", dob: "6-5-2009" },
+        { roll: 7, name: "Jasmeet Kaur Bhatia", admn: 2241, father: "Dharambir Singh", mother: "Harbir Kaur Bhatia", dob: "3-7-1980" },
+        { roll: 8, name: "Namanveer Singh", admn: 2242, father: "Jasdeep Singh", mother: "Jasmeet Kaur Bhatia", dob: "28-6-2004" },
+        { roll: 9, name: "Manveer Singh", admn: 2243, father: "Jasdeep Singh", mother: "Jasmeet Kaur Bhatia", dob: "10-8-2000" },
+        { roll: 10, name: "Gurnaaz Kaur", admn: 2244, father: "Rajinder Singh Babbar", mother: "Sherry Kaur Babbar", dob: "2-1-2010" },
+        { roll: 11, name: "Guransh Singh", admn: 2245, father: "Rajinder Singh Babbar", mother: "Sherry Kaur Babbar", dob: "11-11-2012" },
+        { roll: 12, name: "Sherry Babbar", admn: 2246, father: "N/A", mother: "N/A", dob: "13-09-1983" },
+        { roll: 13, name: "Rajinder Singh", admn: 2247, father: "Harvinder Singh", mother: "Avinash Kaur", dob: "14-02-1990" },
+        { roll: 14, name: "Avinash Kaur", admn: 2248, father: "N/A", mother: "N/A", dob: "05-06-1988" },
+        { roll: 15, name: "Harvinder Singh", admn: 2249, father: "N/A", mother: "N/A", dob: "19-10-1992" }
+      ],
+      "IX C": [
+        { roll: 1, name: "Imaandeep Singh Bhatia", admn: 2301, father: "Dharambir Singh", mother: "Harbir Kaur Bhatia", dob: "25-12-2011" }
+      ]
+    };
+    localStorage.setItem(`singhs_students_${currentBatch}`, JSON.stringify(initialStudents));
+    return initialStudents;
+  }
+  return JSON.parse(s);
+}
+
+let subjects = JSON.parse(localStorage.getItem('singhs_subjects_v1') || 'null') || ['English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Punjabi'];
+
+let currentUser = null;
+
+const OWNER_EMAIL = "Imaandeepsingh@Singhspublicschool.com";
+const OWNER_PASS = "Imaandeepsingh@1313";
+
+function getStoredTeachers() {
+  const stored = localStorage.getItem('singhs_teacher_accounts_v7');
+  if (!stored) {
+    const initialList = [{
+      id: "teacher_default_1",
+      name: "Class Teacher (VIII-A)",
+      email: "teacher@singhspublicschool.edu",
+      pass: "Teacher#1234",
+      status: "active",
+      ctClass: "VIII A",
+      allottedClasses: ["VIII A"],
+      subjects: subjects
+    }];
+    localStorage.setItem('singhs_teacher_accounts_v7', JSON.stringify(initialList));
+    return initialList;
+  }
+  return JSON.parse(stored);
+}
+
+function handleLogin() {
+  const emailInput = document.getElementById('loginEmail').value.trim();
+  const passInput = document.getElementById('loginPassword').value.trim();
+  const errorDiv = document.getElementById('loginError');
+
+  if (emailInput.toLowerCase() === OWNER_EMAIL.toLowerCase() && passInput === OWNER_PASS) {
+    currentUser = { name: "Imaandeep Singh (Owner)", email: OWNER_EMAIL, role: "owner", ctClass: "ALL", allottedClasses: "ALL", subjects: subjects };
+    document.getElementById('loginModal').classList.add('hidden');
+    errorDiv.classList.add('hidden');
+    document.getElementById('userBadgeText').innerText = `${currentUser.name}`;
+    document.getElementById('btnAdminPanel').classList.remove('hidden');
+    initClassDropdowns();
+    applyPermissions();
+    return;
+  }
+
+  const teacherList = getStoredTeachers();
+  const found = teacherList.find(acc => acc.email.toLowerCase() === emailInput.toLowerCase() && acc.pass === passInput);
+
+  if (found) {
+    if (found.status === 'disabled') {
+      errorDiv.innerText = "Account is disabled by Owner.";
+      errorDiv.classList.remove('hidden');
+      return;
+    }
+    currentUser = { ...found, role: "teacher" };
+    document.getElementById('loginModal').classList.add('hidden');
+    errorDiv.classList.add('hidden');
+    document.getElementById('userBadgeText').innerText = `${found.name} ${found.ctClass ? '(CT: '+found.ctClass+')' : ''}`;
+    document.getElementById('btnAdminPanel').classList.add('hidden');
+    
+    // Populate class dropdown based on teacher's allotted classes
+    const classSel = document.getElementById('classSelector');
+    classSel.innerHTML = '';
+    const classesToShow = found.allottedClasses || [found.ctClass].filter(Boolean);
+    classesToShow.forEach(c => classSel.appendChild(new Option(c, c)));
+    
+    initClassDropdowns();
+    applyPermissions();
+  } else {
+    errorDiv.innerText = "Incorrect email or password.";
+    errorDiv.classList.remove('hidden');
+  }
+}
+
+function handleLogout() {
+  currentUser = null;
+  document.getElementById('loginModal').classList.remove('hidden');
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+}
+
+function openAdminPanel() {
+  if (!currentUser || currentUser.role !== 'owner') return;
+  resetTeacherForm();
+  renderTeacherAccountsTable();
+  initClassAdminDropdowns();
+  renderRosterTable();
+  document.getElementById('adminPanelModal').classList.remove('hidden');
+}
+
+function closeAdminPanel() {
+  document.getElementById('adminPanelModal').classList.add('hidden');
+}
+
+function switchAdminTab(tab) {
+  if (tab === 'teachers') {
+    document.getElementById('adminTabTeachers').classList.remove('hidden');
+    document.getElementById('adminTabClasses').classList.add('hidden');
+    document.getElementById('tabBtnTeachers').className = "px-4 py-2 border-b-2 border-blue-900 text-blue-900 font-bold";
+    document.getElementById('tabBtnClasses').className = "px-4 py-2 border-b-2 border-transparent text-gray-500 font-bold hover:text-blue-900";
+  } else {
+    document.getElementById('adminTabTeachers').classList.add('hidden');
+    document.getElementById('adminTabClasses').classList.remove('hidden');
+    document.getElementById('tabBtnClasses').className = "px-4 py-2 border-b-2 border-blue-900 text-blue-900 font-bold";
+    document.getElementById('tabBtnTeachers').className = "px-4 py-2 border-b-2 border-transparent text-gray-500 font-bold hover:text-blue-900";
+  }
+}
+
+function saveTeacherAccount() {
+  const id = document.getElementById('editTeacherId').value;
+  const name = document.getElementById('newTeacherName').value.trim();
+  const email = document.getElementById('newTeacherEmail').value.trim();
+  const pass = document.getElementById('newTeacherPassword').value.trim();
+  const status = document.getElementById('newTeacherStatus').value;
+  const ctClass = document.getElementById('teacherCtClass').value;
+  
+  const checkedClasses = [];
+  document.querySelectorAll('.class-check:checked').forEach(chk => checkedClasses.push(chk.value));
+
+  const checkedSubs = [];
+  document.querySelectorAll('.sub-check:checked').forEach(chk => checkedSubs.push(chk.value));
+
+  if (!name || !email || !pass) {
+    alert("Please fill all teacher details.");
+    return;
+  }
+
+  const teacherList = getStoredTeachers();
+
+  if (id) {
+    const idx = teacherList.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      teacherList[idx] = { id, name, email, pass, status, ctClass, allottedClasses: checkedClasses, subjects: checkedSubs };
+    }
+  } else {
+    teacherList.push({ id: 'teacher_' + Date.now(), name, email, pass, status, ctClass, allottedClasses: checkedClasses, subjects: checkedSubs });
+  }
+
+  localStorage.setItem('singhs_teacher_accounts_v7', JSON.stringify(teacherList));
+  resetTeacherForm();
+  renderTeacherAccountsTable();
+  alert("Teacher profile saved successfully.");
+}
+
+function resetTeacherForm() {
+  document.getElementById('editTeacherId').value = '';
+  document.getElementById('newTeacherName').value = '';
+  document.getElementById('newTeacherEmail').value = '';
+  document.getElementById('newTeacherPassword').value = '';
+  document.getElementById('newTeacherStatus').value = 'active';
+
+  const classes = getStoredClasses();
+  const ctSel = document.getElementById('teacherCtClass');
+  ctSel.innerHTML = '<option value="">None (Subject Teacher Only)</option>';
+  classes.forEach(c => ctSel.appendChild(new Option(c, c)));
+
+  const classContainer = document.getElementById('teacherClassesCheckboxes');
+  classContainer.innerHTML = '';
+  classes.forEach(c => {
+    const lbl = document.createElement('label');
+    lbl.className = 'inline-flex items-center gap-1.5 mr-3 mb-1 text-xs';
+    lbl.innerHTML = `<input type="checkbox" value="${c}" class="class-check" checked> ${c}`;
+    classContainer.appendChild(lbl);
+  });
+
+  document.querySelectorAll('.sub-check').forEach(chk => chk.checked = true);
+  document.getElementById('btnSaveTeacher').innerText = "Save Teacher Profile";
+  document.getElementById('btnCancelEdit').classList.add('hidden');
+}
+
+function editTeacher(id) {
+  const teacherList = getStoredTeachers();
+  const teacher = teacherList.find(t => t.id === id);
+  if (!teacher) return;
+
+  document.getElementById('editTeacherId').value = teacher.id;
+  document.getElementById('newTeacherName').value = teacher.name;
+  document.getElementById('newTeacherEmail').value = teacher.email;
+  document.getElementById('newTeacherPassword').value = teacher.pass;
+  document.getElementById('newTeacherStatus').value = teacher.status || 'active';
+  document.getElementById('teacherCtClass').value = teacher.ctClass || '';
+
+  const classes = getStoredClasses();
+  const classContainer = document.getElementById('teacherClassesCheckboxes');
+  classContainer.innerHTML = '';
+  classes.forEach(c => {
+    const isChecked = (teacher.allottedClasses || []).includes(c);
+    const lbl = document.createElement('label');
+    lbl.className = 'inline-flex items-center gap-1.5 mr-3 mb-1 text-xs';
+    lbl.innerHTML = `<input type="checkbox" value="${c}" class="class-check" ${isChecked ? 'checked' : ''}> ${c}`;
+    classContainer.appendChild(lbl);
+  });
+
+  document.querySelectorAll('.sub-check').forEach(chk => {
+    chk.checked = (teacher.subjects || []).includes(chk.value);
+  });
+
+  document.getElementById('btnSaveTeacher').innerText = "Update Profile";
+  document.getElementById('btnCancelEdit').classList.remove('hidden');
+}
+
+function renderTeacherAccountsTable() {
+  const tbody = document.getElementById('teacherAccountsTable');
+  tbody.innerHTML = '';
+  const teacherList = getStoredTeachers();
+
+  teacherList.forEach((acc) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="p-2 border-r font-bold">${acc.name}</td>
+      <td class="p-2 border-r font-mono text-[11px]">${acc.email}<br><b class="text-blue-900">${acc.pass}</b></td>
+      <td class="p-2 border-r text-center font-bold text-amber-800">${acc.ctClass ? acc.ctClass : 'None'}</td>
+      <td class="p-2 border-r text-[10px]">
+        <b>Classes:</b> ${(acc.allottedClasses || []).join(', ')}<br>
+        <b>Subjects:</b> ${(acc.subjects || []).join(', ')}
+      </td>
+      <td class="p-2 text-center space-x-1">
+        <button onclick="editTeacher('${acc.id}')" class="text-blue-700 font-bold hover:underline">Edit</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function initClassAdminDropdowns() {
+  const classes = getStoredClasses();
+  const sel1 = document.getElementById('selStudentClass');
+  const sel2 = document.getElementById('filterRosterClass');
+  const sel3 = document.getElementById('promoteSourceClass');
+  const ctSel = document.getElementById('teacherCtClass');
+  
+  sel1.innerHTML = ''; sel2.innerHTML = ''; sel3.innerHTML = ''; ctSel.innerHTML = '<option value="">None (Subject Teacher Only)</option>';
+
+  classes.forEach(c => {
+    sel1.appendChild(new Option(c, c));
+    sel2.appendChild(new Option(c, c));
+    sel3.appendChild(new Option(c, c));
+    ctSel.appendChild(new Option(c, c));
+  });
+
+  const classContainer = document.getElementById('teacherClassesCheckboxes');
+  if (classContainer && classContainer.children.length === 0) {
+    classes.forEach(c => {
+      const lbl = document.createElement('label');
+      lbl.className = 'inline-flex items-center gap-1.5 mr-3 mb-1 text-xs';
+      lbl.innerHTML = `<input type="checkbox" value="${c}" class="class-check" checked> ${c}`;
+      classContainer.appendChild(lbl);
+    });
+  }
+  refreshManagementDropdowns();
+}
+
+function updateActiveBatch() {
+  const newBatch = document.getElementById('activeBatchInput').value.trim();
+  if (!newBatch) return;
+  currentBatch = newBatch;
+  
+  let batches = getStoredBatches();
+  if (!batches.includes(newBatch)) {
+    batches.push(newBatch);
+    localStorage.setItem('singhs_batches_v1', JSON.stringify(batches));
+  }
+
+  document.getElementById('headerBatchDisplay').innerText = currentBatch;
+  initGlobalBatchSelector();
+  initClassDropdowns();
+  initClassAdminDropdowns();
+  refreshManagementDropdowns();
+  document.getElementById('activeBatchInput').value = currentBatch;
+  alert(`Active batch switched to ${currentBatch}`);
+}
+
+function promoteClassBatch() {
+  const sourceClass = document.getElementById('promoteSourceClass').value;
+  const targetBatch = document.getElementById('targetBatchInput').value.trim();
+  const targetClass = (document.getElementById('targetPromotedClass').value || sourceClass).trim();
+  if (!sourceClass || !targetBatch || !targetClass) {
+    alert("Please select the source class and enter the target batch and class.");
+    return;
+  }
+  if (!confirm(`Create ${targetClass} in ${targetBatch} using the roster from ${sourceClass}? Existing records in the target batch will not be overwritten. Marks from the previous year will remain archived in the previous batch.`)) return;
+
+  const batches = getStoredBatches();
+  if (!batches.includes(targetBatch)) batches.push(targetBatch);
+  localStorage.setItem('singhs_batches_v1', JSON.stringify(batches));
+
+  const sourceStudents = (getStoredStudents()[sourceClass] || []).map((st, i) => ({...st, roll: i + 1}));
+  const targetClasses = JSON.parse(localStorage.getItem(`singhs_classes_${targetBatch}`) || 'null') || [];
+  if (!targetClasses.includes(targetClass)) targetClasses.push(targetClass);
+  localStorage.setItem(`singhs_classes_${targetBatch}`, JSON.stringify(targetClasses));
+
+  const targetStudentsMap = JSON.parse(localStorage.getItem(`singhs_students_${targetBatch}`) || 'null') || {};
+  if (!targetStudentsMap[targetClass]) targetStudentsMap[targetClass] = sourceStudents;
+  else if (!confirm(`Class ${targetClass} already has students in ${targetBatch}. Replace that roster?`)) return;
+  else targetStudentsMap[targetClass] = sourceStudents;
+  localStorage.setItem(`singhs_students_${targetBatch}`, JSON.stringify(targetStudentsMap));
+
+  // Fresh academic year: do not copy prior-year marks; preserve the old batch as the archive.
+  const targetStoreKey = `singhs_class_store_${targetBatch}`;
+  const targetStore = JSON.parse(localStorage.getItem(targetStoreKey) || '{}');
+  sourceStudents.forEach(st => {
+    if (targetStore[st.admn]) {
+      targetStore[st.admn] = {...targetStore[st.admn], name: st.name, father: st.father, mother: st.mother, roll: st.roll, admn: st.admn, classSection: targetClass, session: targetBatch, marks: {}, coScholastic: {}, reportType: 'Term1', attendancePct: '', remarks: '', reportDate: ''};
+    } else {
+      targetStore[st.admn] = {name: st.name, father: st.father, mother: st.mother, roll: st.roll, admn: st.admn, classSection: targetClass, dob: st.dob || '', session: targetBatch, marks: {}, coScholastic: {}};
+    }
+  });
+  localStorage.setItem(targetStoreKey, JSON.stringify(targetStore));
+
+  // Carry teacher permissions/designations forward to the promoted class.
+  const teachers = getStoredTeachers().map(t => ({
+    ...t,
+    ctClass: t.ctClass === sourceClass ? targetClass : t.ctClass,
+    allottedClasses: (t.allottedClasses || []).map(c => c === sourceClass ? targetClass : c)
+  }));
+  localStorage.setItem('singhs_teacher_accounts_v7', JSON.stringify(teachers));
+  document.getElementById('targetPromotedClass').value = '';
+  initGlobalBatchSelector();
+  refreshManagementDropdowns();
+  alert(`Roster promoted to ${targetClass} in ${targetBatch}. Previous-year marks remain in ${currentBatch}; the target-year records are prepared for the new session.`);
+}
+
+function initGlobalBatchSelector() {
+  const sel = document.getElementById('globalBatchSelector');
+  const batches = getStoredBatches();
+  sel.innerHTML = '';
+  batches.forEach(b => {
+    const opt = new Option(b, b);
+    if (b === currentBatch) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function onGlobalBatchChange() {
+  currentBatch = document.getElementById('globalBatchSelector').value;
+  document.getElementById('headerBatchDisplay').innerText = currentBatch;
+  initClassDropdowns();
+  initClassAdminDropdowns();
+  onClassChange();
+}
+
+function refreshManagementDropdowns() {
+  const classes = getStoredClasses();
+  ['bulkMoveSource','bulkMoveTarget','removeClassSelect','removeSubjectSelect'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+  classes.forEach(c => {
+    ['bulkMoveSource','bulkMoveTarget','removeClassSelect'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.appendChild(new Option(c, c));
+    });
+  });
+  subjects.forEach(sub => document.getElementById('removeSubjectSelect')?.appendChild(new Option(sub, sub)));
+  renderAssessmentSettings();
+}
+
+function moveWholeClass() {
+  const from = document.getElementById('bulkMoveSource').value;
+  const to = document.getElementById('bulkMoveTarget').value;
+  if (!from || !to || from === to) return alert('Choose two different classes.');
+  const students = getStoredStudents();
+  const sourceList = students[from] || [];
+  if (!sourceList.length) return alert(`There are no students in ${from}.`);
+  if (!confirm(`Move all ${sourceList.length} students from ${from} to ${to}? Student marks stay linked to admission numbers and class labels will be updated.`)) return;
+  students[to] = students[to] || [];
+  sourceList.forEach(st => {
+    const existing = students[to].find(x => String(x.admn) === String(st.admn));
+    if (!existing) students[to].push(st);
+  });
+  students[from] = [];
+  localStorage.setItem(`singhs_students_${currentBatch}`, JSON.stringify(students));
+  const store = JSON.parse(localStorage.getItem(`singhs_class_store_${currentBatch}`) || '{}');
+  sourceList.forEach(st => { if (store[st.admn]) store[st.admn].classSection = to; });
+  localStorage.setItem(`singhs_class_store_${currentBatch}`, JSON.stringify(store));
+  localStorage.setItem('singhs_teacher_accounts_v7', JSON.stringify(getStoredTeachers().map(t => ({
+    ...t, ctClass: t.ctClass === from ? to : t.ctClass,
+    allottedClasses: (t.allottedClasses || []).map(c => c === from ? to : c)
+  }))));
+  refreshManagementDropdowns(); initClassDropdowns(); initClassAdminDropdowns(); renderRosterTable();
+  alert(`All students moved from ${from} to ${to}.`);
+}
+
+function moveStudent(cls, idx) {
+  const target = document.getElementById(`moveStudentTarget-${idx}`)?.value;
+  if (!target || target === cls) return alert('Choose a different target class.');
+  const students = getStoredStudents();
+  const st = (students[cls] || [])[idx];
+  if (!st) return;
+  students[target] = students[target] || [];
+  if (students[target].some(x => String(x.admn) === String(st.admn))) return alert('That admission number already exists in the target class.');
+  students[cls].splice(idx, 1); students[target].push(st);
+  st.roll = students[target].length;
+  localStorage.setItem(`singhs_students_${currentBatch}`, JSON.stringify(students));
+  const store = JSON.parse(localStorage.getItem(`singhs_class_store_${currentBatch}`) || '{}');
+  if (store[st.admn]) { store[st.admn].classSection = target; store[st.admn].roll = st.roll; }
+  localStorage.setItem(`singhs_class_store_${currentBatch}`, JSON.stringify(store));
+  renderRosterTable(); initClassDropdowns(); refreshManagementDropdowns();
+}
+
+function removeClassSafely() {
+  const cls = document.getElementById('removeClassSelect').value;
+  if (!cls) return;
+  const students = getStoredStudents();
+  if ((students[cls] || []).length) return alert('This class still has students. Move them to another class before removing it.');
+  if (!confirm(`Remove empty class ${cls} from batch ${currentBatch}?`)) return;
+  const classes = getStoredClasses().filter(c => c !== cls);
+  localStorage.setItem(`singhs_classes_${currentBatch}`, JSON.stringify(classes));
+  delete students[cls]; localStorage.setItem(`singhs_students_${currentBatch}`, JSON.stringify(students));
+  localStorage.setItem('singhs_teacher_accounts_v7', JSON.stringify(getStoredTeachers().map(t => ({
+    ...t, ctClass: t.ctClass === cls ? '' : t.ctClass,
+    allottedClasses: (t.allottedClasses || []).filter(c => c !== cls)
+  }))));
+  refreshManagementDropdowns(); initClassDropdowns(); initClassAdminDropdowns(); renderRosterTable();
+}
+
+function addSubject() {
+  const name = document.getElementById('newSubjectName').value.trim();
+  if (!name) return;
+  if (subjects.some(s => s.toLowerCase() === name.toLowerCase())) return alert('That subject already exists.');
+  subjects.push(name); localStorage.setItem('singhs_subjects_v1', JSON.stringify(subjects));
+  document.getElementById('newSubjectName').value = '';
+  document.getElementById('subjectAllotmentCheckboxes').insertAdjacentHTML('beforeend', `<label class="inline-flex items-center gap-1"><input type="checkbox" value="${name}" checked class="sub-check"> ${name}</label>`);
+  renderSubjectInputs(); initMasterSubjectDropdown(); refreshManagementDropdowns(); updatePreview();
+}
+
+function removeSubject() {
+  const sub = document.getElementById('removeSubjectSelect').value;
+  if (!sub) return;
+  if (!confirm(`Remove ${sub} from the subject list? Saved marks will remain in storage but will no longer appear in the current interface.`)) return;
+  subjects = subjects.filter(s => s !== sub); localStorage.setItem('singhs_subjects_v1', JSON.stringify(subjects));
+  document.querySelectorAll('.sub-check').forEach(el => { if (el.value === sub) el.closest('label')?.remove(); });
+  renderSubjectInputs(); initMasterSubjectDropdown(); refreshManagementDropdowns(); updatePreview();
+}
+
+const DEFAULT_ASSESSMENTS = {
+  att: {label:'Attendance', max:5, required:true}, se:{label:'Subject Enrichment',max:5,required:true},
+  pb:{label:'Project Based Activities',max:5,required:true}, port:{label:'Portfolio',max:5,required:true},
+  ma:{label:'Multiple Assessment',max:5,required:true}
+};
+function getAssessmentSettings() {
+  return JSON.parse(localStorage.getItem('singhs_assessment_settings_v1') || 'null') || DEFAULT_ASSESSMENTS;
+}
+function renderAssessmentSettings() {
+  const holder = document.getElementById('assessmentSettings'); if (!holder) return;
+  const cfg = getAssessmentSettings(); holder.innerHTML = '';
+  Object.keys(DEFAULT_ASSESSMENTS).forEach(key => {
+    const item = cfg[key] || DEFAULT_ASSESSMENTS[key];
+    const div = document.createElement('div'); div.className = 'bg-white border rounded p-2';
+    div.innerHTML = `<label class="block font-semibold mb-1">${item.label}</label><div class="flex items-center gap-2"><span>Max</span><input type="number" min="0" max="100" step="0.5" id="assessmentMax-${key}" value="${item.max}" class="w-16 border rounded p-1"><label class="inline-flex items-center gap-1"><input type="checkbox" id="assessmentRequired-${key}" ${item.required ? 'checked' : ''}> Required</label></div>`;
+    holder.appendChild(div);
+  });
+  const toggle = document.getElementById('compressMarksToggle');
+  if (toggle) toggle.checked = localStorage.getItem('singhs_compress_marks_v1') === 'true';
+}
+function saveAssessmentSettings() {
+  const cfg = getAssessmentSettings();
+  Object.keys(DEFAULT_ASSESSMENTS).forEach(key => {
+    const maxEl = document.getElementById(`assessmentMax-${key}`);
+    const reqEl = document.getElementById(`assessmentRequired-${key}`);
+    if (maxEl && reqEl) cfg[key] = {...DEFAULT_ASSESSMENTS[key], max: Math.max(0, Number(maxEl.value) || 0), required: reqEl.checked};
+  });
+  localStorage.setItem('singhs_assessment_settings_v1', JSON.stringify(cfg));
+  const toggle = document.getElementById('compressMarksToggle');
+  if (toggle) localStorage.setItem('singhs_compress_marks_v1', String(toggle.checked));
+  updateAssessmentInputLimits(); updatePreview(); renderMasterGrid();
+}
+function updateAssessmentInputLimits() {
+  const cfg = getAssessmentSettings();
+  const compress = localStorage.getItem('singhs_compress_marks_v1') === 'true';
+  [['att','m-att'],['se','m-se'],['pb','m-pb'],['port','m-port'],['ma','m-ma']].forEach(([key, cls]) => {
+    const item = cfg[key] || DEFAULT_ASSESSMENTS[key];
+    document.querySelectorAll('.' + cls).forEach(input => {
+      input.max = compress ? 5 : (Number(item.max) || 0);
+      input.disabled = item.required === false;
+    });
+  });
+}
+function effectiveComponentMark(value, key) {
+  const cfg = getAssessmentSettings()[key] || DEFAULT_ASSESSMENTS[key];
+  const n = Number(value) || 0;
+  if (cfg.required === false) return {mark:0, max:0};
+  const max = Number(cfg.max) || 0;
+  const normalized = localStorage.getItem('singhs_compress_marks_v1') === 'true' ? (n / 5) * max : n;
+  return {mark: Math.min(max, Math.max(0, normalized)), max};
+}
+
+function addNewClass() {
+  const name = document.getElementById('newClassName').value.trim();
+  if (!name) return;
+  const classes = getStoredClasses();
+  if (!classes.includes(name)) {
+    classes.push(name);
+    localStorage.setItem(`singhs_classes_${currentBatch}`, JSON.stringify(classes));
+    const students = getStoredStudents();
+    if (!students[name]) students[name] = [];
+    localStorage.setItem(`singhs_students_${currentBatch}`, JSON.stringify(students));
+    alert(`Class ${name} added successfully for batch ${currentBatch}.`);
+    document.getElementById('newClassName').value = '';
+    initClassDropdowns();
+    initClassAdminDropdowns();
+    refreshManagementDropdowns();
+  } else {
+    alert(`Class ${name} already exists in batch ${currentBatch}.`);
+  }
+}
+
+function addNewStudent() {
+  const cls = document.getElementById('selStudentClass').value;
+  const name = document.getElementById('newStName').value.trim();
+  const roll = document.getElementById('newStRoll').value.trim();
+  const admn = document.getElementById('newStAdmn').value.trim();
+  const dob = document.getElementById('newStDob').value.trim();
+  const father = document.getElementById('newStFather').value.trim();
+  const mother = document.getElementById('newStMother').value.trim();
+
+  if (!cls || !name || !admn) {
+    alert("Please enter Class, Name, and Admission Number.");
+    return;
+  }
+
+  const students = getStoredStudents();
+  if (!students[cls]) students[cls] = [];
+
+  students[cls].push({ roll: parseInt(roll)||(students[cls].length + 1), name, admn: parseInt(admn), father, mother, dob });
+  localStorage.setItem(`singhs_students_${currentBatch}`, JSON.stringify(students));
+  alert(`Student ${name} added to Class ${cls} in batch ${currentBatch}.`);
+  
+  document.getElementById('newStName').value = '';
+  document.getElementById('newStRoll').value = '';
+  document.getElementById('newStAdmn').value = '';
+  document.getElementById('newStDob').value = '';
+  document.getElementById('newStFather').value = '';
+  document.getElementById('newStMother').value = '';
+
+  renderRosterTable();
+  initClassDropdowns();
+}
+
+function renderRosterTable() {
+  const cls = document.getElementById('filterRosterClass').value;
+  const tbody = document.getElementById('rosterTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const studentsMap = getStoredStudents();
+  const students = studentsMap[cls] || [];
+
+  students.forEach((st, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="p-2 border-r font-bold text-blue-900">${cls}</td>
+      <td class="p-2 border-r font-bold">${st.roll}</td>
+      <td class="p-2 border-r font-medium">${st.admn}</td>
+      <td class="p-2 border-r font-bold">${st.name}</td>
+      <td class="p-2 border-r">${st.dob}</td>
+      <td class="p-2 border-r">${st.father}</td>
+      <td class="p-2 text-center"><div class="flex items-center gap-1 justify-center"><select id="moveStudentTarget-${idx}" class="border rounded p-1">${getStoredClasses().filter(c => c !== cls).map(c => `<option value="${c}">${c}</option>`).join('')}</select><button onclick="moveStudent('${cls}', ${idx})" class="text-indigo-700 font-bold hover:underline">Move</button><button onclick="deleteStudent('${cls}', ${idx})" class="text-red-600 font-bold hover:underline">Delete</button></div></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function deleteStudent(cls, idx) {
+  if (!confirm('Delete this student from the current class roster? Saved marks are retained in storage.')) return;
+  const students = getStoredStudents();
+  students[cls].splice(idx, 1);
+  localStorage.setItem(`singhs_students_${currentBatch}`, JSON.stringify(students));
+  renderRosterTable();
+  initClassDropdowns();
+}
+
+// PERMISSIONS ENFORCEMENT
+function applyPermissions() {
+  if (!currentUser) return;
+  const isOwner = currentUser.role === 'owner';
+  const selectedClass = document.getElementById('classSelector').value;
+  
+  const isClassTeacherForSelected = isOwner || (currentUser.ctClass === selectedClass);
+
+  // Profile inputs & co-scholastic restricted to Owner or Class Teacher of this specific class
+  const profileInputs = ['studentName', 'fatherName', 'motherName', 'rollNo', 'classSection', 'dob', 'academicSession', 'attendancePct', 'remarksInput', 'reportDate'];
+  profileInputs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !isClassTeacherForSelected;
+  });
+
+  document.querySelectorAll('.co-grade').forEach(el => el.disabled = !isClassTeacherForSelected);
+
+  // SUBJECT ISOLATION: Check if teacher teaches this class and this subject
+  const allowedClasses = isOwner ? 'ALL' : (currentUser.allottedClasses || []);
+  const allowedSubs = isOwner ? subjects : (currentUser.subjects || []);
+  const canTeachThisClass = isOwner || allowedClasses.includes(selectedClass);
+
+  subjects.forEach(sub => {
+    const isAllowedSub = canTeachThisClass && (isOwner || isClassTeacherForSelected || allowedSubs.includes(sub));
+    const subjectBox = document.getElementById(`subjectBox-${sub.replace(/\s+/g, '')}`);
+    
+    if (subjectBox) {
+      if (!isAllowedSub) {
+        subjectBox.style.display = 'none';
+      } else {
+        subjectBox.style.display = 'block';
+        subjectBox.querySelectorAll('input').forEach(inp => inp.disabled = false);
+      }
+    }
+  });
+}
+
+function initClassDropdowns() {
+  const classes = getStoredClasses();
+  const sel = document.getElementById('classSelector');
+  if (!currentUser || currentUser.role === 'owner') {
+    sel.innerHTML = '';
+    classes.forEach(c => sel.appendChild(new Option(c, c)));
+  } else if (currentUser) {
+    sel.innerHTML = '';
+    const allowed = currentUser.allottedClasses || [currentUser.ctClass].filter(Boolean);
+    const validClasses = classes.filter(c => allowed.includes(c));
+    if (validClasses.length === 0) {
+      classes.forEach(c => sel.appendChild(new Option(c, c)));
+    } else {
+      validClasses.forEach(c => sel.appendChild(new Option(c, c)));
+    }
+  }
+  onClassChange();
+  refreshManagementDropdowns();
+}
+
+function onClassChange() {
+  const cls = document.getElementById('classSelector').value;
+  const studentsMap = getStoredStudents();
+  const students = studentsMap[cls] || [];
+  const select = document.getElementById('studentRoster');
+  select.innerHTML = '';
+
+  students.forEach((st, idx) => {
+    const opt = new Option(`Roll ${st.roll}: ${st.name} (Admn: ${st.admn})`, idx);
+    select.appendChild(opt);
+  });
+
+  document.getElementById('rosterCountText').innerText = `${students.length} Students Loaded from ${cls}`;
+  onStudentSelectChange();
+}
+
+function onStudentSelectChange() {
+  const cls = document.getElementById('classSelector').value;
+  const idx = document.getElementById('studentRoster').value;
+  const studentsMap = getStoredStudents();
+  const students = studentsMap[cls] || [];
+  const st = students[idx];
+  if (!st) return;
+
+  const localStore = JSON.parse(localStorage.getItem(`singhs_class_store_${currentBatch}`) || '{}');
+  const savedData = localStore[st.admn];
+
+  if (savedData) {
+    loadStudentDataIntoForm(savedData);
+  } else {
+    document.getElementById('studentName').value = st.name;
+    document.getElementById('fatherName').value = st.father;
+    document.getElementById('motherName').value = st.mother;
+    document.getElementById('rollNo').value = st.roll;
+    document.getElementById('admissionNo').value = st.admn;
+    document.getElementById('classSection').value = cls;
+    document.getElementById('dob').value = st.dob || '';
+    document.getElementById('academicSession').value = currentBatch;
+    document.getElementById('attendancePct').value = '';
+    document.getElementById('reportDate').value = '';
+    document.getElementById('remarksInput').value = '';
+    subjects.forEach(sub => {
+      document.querySelector(`.m-att[data-sub="${sub}"]`).value = 0;
+      document.querySelector(`.m-se[data-sub="${sub}"]`).value = 0;
+      document.querySelector(`.m-pb[data-sub="${sub}"]`).value = 0;
+      document.querySelector(`.m-port[data-sub="${sub}"]`).value = 0;
+      document.querySelector(`.m-ma[data-sub="${sub}"]`).value = 0;
+      document.querySelector(`.m-pt[data-sub="${sub}"]`).value = 0;
+      document.querySelector(`.m-t1[data-sub="${sub}"]`).value = 0;
+      const t1Term1El = document.querySelector(`.m-t1term1[data-sub="${sub}"]`);
+      if (t1Term1El) t1Term1El.value = 0;
+      
+      document.querySelector(`.ml-pt[data-sub="${sub}"]`).checked = false;
+      document.querySelector(`.od-pt[data-sub="${sub}"]`).checked = false;
+      document.querySelector(`.absent-pt[data-sub="${sub}"]`).checked = false;
+
+      document.querySelector(`.ml-t1[data-sub="${sub}"]`).checked = false;
+      document.querySelector(`.od-t1[data-sub="${sub}"]`).checked = false;
+      document.querySelector(`.absent-t1[data-sub="${sub}"]`).checked = false;
+
+      const mlT1Term1El = document.querySelector(`.ml-t1term1[data-sub="${sub}"]`);
+      if (mlT1Term1El) mlT1Term1El.checked = false;
+      const odT1Term1El = document.querySelector(`.od-t1term1[data-sub="${sub}"]`);
+      if (odT1Term1El) odT1Term1El.checked = false;
+      const absentT1Term1El = document.querySelector(`.absent-t1term1[data-sub="${sub}"]`);
+      if (absentT1Term1El) absentT1Term1El.checked = false;
+    });
+  }
+  document.getElementById('classSection').value = cls;
+  document.getElementById('academicSession').value = currentBatch;
+  applyPermissions();
+  updatePreview();
+}
+
+function switchView(view) {
+  const reportSec = document.getElementById('reportCardView');
+  const masterSec = document.getElementById('masterGridView');
+  const btnRep = document.getElementById('btnViewReport');
+  const btnMas = document.getElementById('btnViewMaster');
+
+  if (view === 'reportCard') {
+    reportSec.classList.remove('hidden');
+    masterSec.classList.add('hidden');
+    btnRep.className = "bg-blue-700 hover:bg-blue-800 px-3 py-2 text-xs rounded font-bold shadow transition border border-blue-400";
+    btnMas.className = "bg-blue-800 hover:bg-blue-700 px-3 py-2 text-xs rounded font-semibold shadow transition text-blue-200";
+  } else {
+    reportSec.classList.add('hidden');
+    masterSec.classList.remove('hidden');
+    btnMas.className = "bg-blue-700 hover:bg-blue-800 px-3 py-2 text-xs rounded font-bold shadow transition border border-blue-400";
+    btnRep.className = "bg-blue-800 hover:bg-blue-700 px-3 py-2 text-xs rounded font-semibold shadow transition text-blue-200";
+    initMasterSubjectDropdown();
+    renderMasterGrid();
+  }
+}
+
+function getGrade(percentage) {
+  if (percentage >= 91) return 'A1';
+  if (percentage >= 81) return 'A2';
+  if (percentage >= 71) return 'B1';
+  if (percentage >= 61) return 'B2';
+  if (percentage >= 51) return 'C1';
+  if (percentage >= 41) return 'C2';
+  if (percentage >= 33) return 'D';
+  return 'E';
+}
+
+function renderSubjectInputs() {
+  const container = document.getElementById('subjectsContainer');
+  container.innerHTML = '';
+  subjects.forEach(sub => {
+    const div = document.createElement('div');
+    div.id = `subjectBox-${sub.replace(/\s+/g, '')}`;
+    div.className = 'border p-2 rounded bg-gray-50 text-xs space-y-2';
+    div.innerHTML = `
+      <div class="flex justify-between items-center font-bold text-blue-950 border-b pb-1">
+        <span>${sub}</span>
+        <div class="flex flex-wrap gap-2 text-[10px] font-normal">
+          <span class="text-purple-900 font-semibold">PT:</span>
+          <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" class="ml-pt" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'ml-pt', ['od-pt', 'absent-pt'])"> ML</label>
+          <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" class="od-pt" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'od-pt', ['ml-pt', 'absent-pt'])"> OD</label>
+          <label class="inline-flex items-center gap-0.5 cursor-pointer text-red-700 font-bold"><input type="checkbox" class="absent-pt" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'absent-pt', ['ml-pt', 'od-pt'])"> AB</label>
+          
+          <span class="text-purple-900 font-semibold ml-1">Term End:</span>
+          <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" class="ml-t1" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'ml-t1', ['od-t1', 'absent-t1'])"> ML</label>
+          <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" class="od-t1" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'od-t1', ['ml-t1', 'absent-t1'])"> OD</label>
+          <label class="inline-flex items-center gap-0.5 cursor-pointer text-red-700 font-bold"><input type="checkbox" class="absent-t1" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'absent-t1', ['ml-t1', 'od-t1'])"> AB</label>
+          
+          <div id="term1ExtraCheck-${sub.replace(/\s+/g, '')}" class="hidden flex items-center gap-2 pl-2 border-l border-gray-300">
+            <span class="text-indigo-900 font-semibold">Term-1:</span>
+            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" class="ml-t1term1" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'ml-t1term1', ['od-t1term1', 'absent-t1term1'])"> ML</label>
+            <label class="inline-flex items-center gap-0.5 cursor-pointer"><input type="checkbox" class="od-t1term1" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'od-t1term1', ['ml-t1term1', 'absent-t1term1'])"> OD</label>
+            <label class="inline-flex items-center gap-0.5 cursor-pointer text-red-700 font-bold"><input type="checkbox" class="absent-t1term1" data-sub="${sub}" onchange="handleCheckboxGroup(this, 'absent-t1term1', ['ml-t1term1', 'od-t1term1'])"> AB</label>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-10 gap-1 items-center" id="subjectInputGrid-${sub.replace(/\s+/g, '')}">
+        <span class="font-semibold text-[10px] text-gray-600">Marks:</span>
+        <input type="number" min="0" max="5" value="0" class="m-att border p-1 rounded text-center" placeholder="Att" data-sub="${sub}" title="Attendance">
+        <input type="number" min="0" max="5" value="0" class="m-se border p-1 rounded text-center" placeholder="SE" data-sub="${sub}" title="Subject Enrichment">
+        <input type="number" min="0" max="5" value="0" class="m-pb border p-1 rounded text-center" placeholder="PB" data-sub="${sub}" title="Project Based">
+        <input type="number" min="0" max="5" value="0" class="m-port border p-1 rounded text-center" placeholder="Port" data-sub="${sub}" title="Portfolio">
+        <input type="number" min="0" max="5" value="0" class="m-ma border p-1 rounded text-center" placeholder="MA" data-sub="${sub}" title="Multiple Assessment">
+        <input type="number" min="0" max="40" value="0" class="m-pt border p-1 rounded text-center font-bold text-blue-800" placeholder="PT/40" data-sub="${sub}" title="PT out of 40">
+        <input type="number" min="0" max="80" value="0" class="m-t1 border p-1 rounded text-center font-bold text-blue-800" placeholder="TE/80" data-sub="${sub}" title="Term End out of 80">
+        
+        <input type="number" min="0" max="80" value="0" class="m-t1term1 border p-1 rounded text-center font-bold text-indigo-800 hidden" placeholder="T1/80" data-sub="${sub}" title="Term 1 Marks out of 80">
+        <span id="total-${sub.replace(/\s+/g, '')}" class="font-bold text-center text-blue-900 text-xs">0</span>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  updateAssessmentInputLimits();
+  document.querySelectorAll('#erpForm input').forEach(input => {
+    input.addEventListener('input', () => { updatePreview(); scheduleAutoSave(); });
+  });
+}
+
+function handleCheckboxGroup(changedEl, currentClass, peerClasses) {
+  const sub = changedEl.getAttribute('data-sub');
+  if (changedEl.checked) {
+    peerClasses.forEach(peerClass => {
+      document.querySelector(`.${peerClass}[data-sub="${sub}"]`).checked = false;
+    });
+    if (currentClass.includes('pt')) {
+      const ptInput = document.querySelector(`.m-pt[data-sub="${sub}"]`);
+      ptInput.value = 0;
+      ptInput.disabled = true;
+    } else if (currentClass.includes('t1term1')) {
+      const t1Term1Input = document.querySelector(`.m-t1term1[data-sub="${sub}"]`);
+      t1Term1Input.value = 0;
+      t1Term1Input.disabled = true;
+    } else {
+      const t1Input = document.querySelector(`.m-t1[data-sub="${sub}"]`);
+      t1Input.value = 0;
+      t1Input.disabled = true;
+    }
+  } else {
+    if (currentClass.includes('pt')) {
+      document.querySelector(`.m-pt[data-sub="${sub}"]`).disabled = false;
+    } else if (currentClass.includes('t1term1')) {
+      document.querySelector(`.m-t1term1[data-sub="${sub}"]`).disabled = false;
+    } else {
+      document.querySelector(`.m-t1[data-sub="${sub}"]`).disabled = false;
+    }
+  }
+  updatePreview();
+}
+
+function updatePreview() {
+  const isTerm2 = document.getElementById('reportTypeTerm2').checked;
+  const annualYear = document.getElementById('annualYearInput').value;
+
+  if (isTerm2) {
+    document.getElementById('lblHeaderTitle').innerHTML = `ANNUAL REPORT CARD: ${annualYear}`;
+    document.getElementById('lblHeaderSubTitle').innerText = `TERM-II`;
+    document.getElementById('lblPtSubHeader').innerHTML = `P.T-2<br>(max 5)`;
+    document.getElementById('lblTermEndHeader').innerHTML = `Term<br>End-2<br>(50)`;
+    document.getElementById('lblTermColumnHeader').innerHTML = `Term-2<br>(100)`;
+    document.getElementById('lblScholasticAreaSpan').colSpan = 9;
+
+    let t1Header = document.getElementById('thTermEnd1Column');
+    if (!t1Header) {
+      const termEndTh = document.getElementById('lblTermEndHeader');
+      t1Header = document.createElement('th');
+      t1Header.id = 'thTermEnd1Column';
+      t1Header.rowSpan = 3;
+      t1Header.className = 'border border-black px-1 py-0.5 text-center align-middle';
+      t1Header.innerHTML = `Term<br>End-1<br>(20)`;
+      termEndTh.parentNode.insertBefore(t1Header, termEndTh);
+    }
+
+    subjects.forEach(sub => {
+      const extraCheckDiv = document.getElementById(`term1ExtraCheck-${sub.replace(/\s+/g, '')}`);
+      if (extraCheckDiv) extraCheckDiv.classList.remove('hidden');
+      const t1Term1Input = document.querySelector(`.m-t1term1[data-sub="${sub}"]`);
+      if (t1Term1Input) t1Term1Input.classList.remove('hidden');
+      const grid = document.getElementById(`subjectInputGrid-${sub.replace(/\s+/g, '')}`);
+      if (grid && !grid.classList.contains('grid-cols-11')) {
+        grid.className = 'grid grid-cols-11 gap-1 items-center';
+      }
+    });
+
+  } else {
+    const session = document.getElementById('academicSession').value;
+    document.getElementById('lblHeaderTitle').innerHTML = `PROGRESS REPORT: ${session}`;
+    document.getElementById('lblHeaderSubTitle').innerText = `TERM-I`;
+    document.getElementById('lblPtSubHeader').innerHTML = `P.T-1<br>(max 5)`;
+    document.getElementById('lblTermEndHeader').innerHTML = `Term<br>End-1<br>(70)`;
+    document.getElementById('lblTermColumnHeader').innerHTML = `Term-1<br>(100)`;
+    document.getElementById('lblScholasticAreaSpan').colSpan = 8;
+
+    const t1Header = document.getElementById('thTermEnd1Column');
+    if (t1Header) t1Header.remove();
+
+    subjects.forEach(sub => {
+      const extraCheckDiv = document.getElementById(`term1ExtraCheck-${sub.replace(/\s+/g, '')}`);
+      if (extraCheckDiv) extraCheckDiv.classList.add('hidden');
+      const t1Term1Input = document.querySelector(`.m-t1term1[data-sub="${sub}"]`);
+      if (t1Term1Input) t1Term1Input.classList.add('hidden');
+      const grid = document.getElementById(`subjectInputGrid-${sub.replace(/\s+/g, '')}`);
+      if (grid) {
+        grid.className = 'grid grid-cols-10 gap-1 items-center';
+      }
+    });
+  }
+
+  document.getElementById('lblStudentName').innerText = document.getElementById('studentName').value;
+  document.getElementById('lblFatherName').innerText = document.getElementById('fatherName').value;
+  document.getElementById('lblRollNo').innerText = document.getElementById('rollNo').value;
+  document.getElementById('lblClassSection').innerText = document.getElementById('classSection').value;
+  document.getElementById('lblDOB').innerText = document.getElementById('dob').value;
+  document.getElementById('lblMotherName').innerText = document.getElementById('motherName').value;
+  document.getElementById('lblAdmissionNo').innerText = document.getElementById('admissionNo').value;
+  document.getElementById('lblAttendance').innerText = document.getElementById('attendancePct').value;
+  document.getElementById('lblReportDate').innerText = document.getElementById('reportDate').value;
+  document.getElementById('lblRemarks').innerText = document.getElementById('remarksInput').value;
+
+  const tableBody = document.getElementById('scholasticTableBody');
+  tableBody.innerHTML = '';
+  let grandTotal = 0;
+  let maxGrandTotal = 0;
+
+  subjects.forEach(sub => {
+    const box = document.getElementById(`subjectBox-${sub.replace(/\s+/g, '')}`);
+    if (box && box.style.display === 'none') return;
+
+    const attCfg = effectiveComponentMark(document.querySelector(`.m-att[data-sub="${sub}"]`)?.value, 'att');
+    const seCfg = effectiveComponentMark(document.querySelector(`.m-se[data-sub="${sub}"]`)?.value, 'se');
+    const pbCfg = effectiveComponentMark(document.querySelector(`.m-pb[data-sub="${sub}"]`)?.value, 'pb');
+    const portCfg = effectiveComponentMark(document.querySelector(`.m-port[data-sub="${sub}"]`)?.value, 'port');
+    const maCfg = effectiveComponentMark(document.querySelector(`.m-ma[data-sub="${sub}"]`)?.value, 'ma');
+    const att = attCfg.mark, se = seCfg.mark, pb = pbCfg.mark, port = portCfg.mark, ma = maCfg.mark;
+
+    const isMlPt = document.querySelector(`.ml-pt[data-sub="${sub}"]`).checked;
+    const isOdPt = document.querySelector(`.od-pt[data-sub="${sub}"]`).checked;
+    const isAbsentPt = document.querySelector(`.absent-pt[data-sub="${sub}"]`).checked;
+
+    const isMlT1 = document.querySelector(`.ml-t1[data-sub="${sub}"]`).checked;
+    const isOdT1 = document.querySelector(`.od-t1[data-sub="${sub}"]`).checked;
+    const isAbsentT1 = document.querySelector(`.absent-t1[data-sub="${sub}"]`).checked;
+
+    const ptRaw = parseFloat(document.querySelector(`.m-pt[data-sub="${sub}"]`)?.value) || 0;
+    const t1Raw = parseFloat(document.querySelector(`.m-t1[data-sub="${sub}"]`)?.value) || 0;
+
+    let ptVal = 0;
+    if (!isMlPt && !isOdPt && !isAbsentPt) {
+      ptVal = Math.round((ptRaw / 40) * 5);
+      if (ptVal > 5) ptVal = 5;
+    }
+
+    let t1Val = 0;
+    let t1Term1Val = 0;
+    const assessmentCfg = getAssessmentSettings();
+    let subjectMax = Object.keys(DEFAULT_ASSESSMENTS).reduce((sum, key) => sum + ((assessmentCfg[key] || DEFAULT_ASSESSMENTS[key]).required === false ? 0 : (Number((assessmentCfg[key] || DEFAULT_ASSESSMENTS[key]).max) || 0)), 0) + 5 + (isTerm2 ? 70 : 70);
+    let ptDisplay = ptVal;
+    let t1Display = '';
+    let t1Term1Display = '';
+
+    if (isMlPt) { ptDisplay = '<span class="text-red-700 font-bold">ML</span>'; subjectMax -= 5; }
+    else if (isOdPt) { ptDisplay = '<span class="text-blue-700 font-bold">OD</span>'; subjectMax -= 5; }
+    else if (isAbsentPt) { ptDisplay = '<span class="text-red-800 font-bold">AB</span>'; }
+
+    if (!isTerm2) {
+      if (isMlT1) { t1Display = '<span class="text-red-700 font-bold">ML</span>'; subjectMax -= 70; }
+      else if (isOdT1) { t1Display = '<span class="text-blue-700 font-bold">OD</span>'; subjectMax -= 70; }
+      else if (isAbsentT1) { t1Display = '<span class="text-red-800 font-bold">AB</span>'; }
+      else { t1Val = Math.round((t1Raw / 80) * 70); if (t1Val > 70) t1Val = 70; t1Display = t1Val; }
+    } else {
+      if (isMlT1) { t1Display = '<span class="text-red-700 font-bold">ML</span>'; subjectMax -= 50; }
+      else if (isOdT1) { t1Display = '<span class="text-blue-700 font-bold">OD</span>'; subjectMax -= 50; }
+      else if (isAbsentT1) { t1Display = '<span class="text-red-800 font-bold">AB</span>'; }
+      else { t1Val = Math.round((t1Raw / 80) * 50); if (t1Val > 50) t1Val = 50; t1Display = t1Val; }
+
+      const isMlT1Term1 = document.querySelector(`.ml-t1term1[data-sub="${sub}"]`).checked;
+      const isOdT1Term1 = document.querySelector(`.od-t1term1[data-sub="${sub}"]`).checked;
+      const isAbsentT1Term1 = document.querySelector(`.absent-t1term1[data-sub="${sub}"]`).checked;
+      const t1Term1Raw = parseFloat(document.querySelector(`.m-t1term1[data-sub="${sub}"]`)?.value) || 0;
+
+      if (isMlT1Term1) { t1Term1Display = '<span class="text-red-700 font-bold">ML</span>'; subjectMax -= 20; }
+      else if (isOdT1Term1) { t1Term1Display = '<span class="text-blue-700 font-bold">OD</span>'; subjectMax -= 20; }
+      else if (isAbsentT1Term1) { t1Term1Display = '<span class="text-red-800 font-bold">AB</span>'; }
+      else { t1Term1Val = Math.round((t1Term1Raw / 80) * 20); if (t1Term1Val > 20) t1Term1Val = 20; t1Term1Display = t1Term1Val; }
+    }
+
+    const total = att + se + pb + port + ma + ptVal + t1Val + t1Term1Val;
+    grandTotal += total;
+    maxGrandTotal += subjectMax;
+    const totalSpan = document.getElementById(`total-${sub.replace(/\s+/g, '')}`);
+    if (totalSpan) totalSpan.innerText = total;
+
+    const subPercentage = subjectMax > 0 ? (total / subjectMax) * 100 : 0;
+    const tr = document.createElement('tr');
+    tr.className = "border-b border-black";
+
+    if (!isTerm2) {
+      tr.innerHTML = `
+        <td class="border border-black px-1 py-0.5 text-left font-bold">${sub}</td>
+        <td class="border border-black px-1 py-0.5">${att}</td>
+        <td class="border border-black px-1 py-0.5">${se}</td>
+        <td class="border border-black px-1 py-0.5">${pb}</td>
+        <td class="border border-black px-1 py-0.5">${port}</td>
+        <td class="border border-black px-1 py-0.5">${ma}</td>
+        <td class="border border-black px-1 py-0.5">${ptDisplay}</td>
+        <td class="border border-black px-1 py-0.5">${t1Display}</td>
+        <td class="border border-black px-1 py-0.5 font-bold">${total}</td>
+        <td class="border border-black px-1 py-0.5 font-bold">${getGrade(subPercentage)}</td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td class="border border-black px-1 py-0.5 text-left font-bold">${sub}</td>
+        <td class="border border-black px-1 py-0.5">${att}</td>
+        <td class="border border-black px-1 py-0.5">${se}</td>
+        <td class="border border-black px-1 py-0.5">${pb}</td>
+        <td class="border border-black px-1 py-0.5">${port}</td>
+        <td class="border border-black px-1 py-0.5">${ma}</td>
+        <td class="border border-black px-1 py-0.5">${ptDisplay}</td>
+        <td class="border border-black px-1 py-0.5">${t1Term1Display}</td>
+        <td class="border border-black px-1 py-0.5">${t1Display}</td>
+        <td class="border border-black px-1 py-0.5 font-bold">${total}</td>
+        <td class="border border-black px-1 py-0.5 font-bold">${getGrade(subPercentage)}</td>
+      `;
+    }
+    tableBody.appendChild(tr);
+  });
+
+  const totalPercentage = maxGrandTotal > 0 ? ((grandTotal / maxGrandTotal) * 100).toFixed(2) : "0.00";
+  document.getElementById('lblGrandTotal').innerText = `${grandTotal} / ${maxGrandTotal}`;
+  document.getElementById('lblPercentage').innerText = `${totalPercentage}%`;
+
+  const coContainer = document.getElementById('coScholasticRows');
+  coContainer.innerHTML = '';
+  document.querySelectorAll('.co-grade').forEach(input => {
+    const div = document.createElement('div');
+    div.className = "flex border-b border-black last:border-0 px-1 py-0.5";
+    div.innerHTML = `
+      <div class="w-3/4 font-semibold px-1">${input.getAttribute('data-activity')}</div>
+      <div class="w-1/4 text-center font-bold">${input.value}</div>
+    `;
+    coContainer.appendChild(div);
+  });
+}
+
+let autoSaveTimer = null;
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    if (document.getElementById('admissionNo')?.value) saveToLocalStorage();
+  }, 450);
+}
+
+function saveToLocalStorage() {
+  const admn = document.getElementById('admissionNo').value;
+  if (!admn) return;
+  const marksData = {};
+  subjects.forEach(sub => {
+    marksData[sub] = {
+      att: document.querySelector(`.m-att[data-sub="${sub}"]`).value,
+      se: document.querySelector(`.m-se[data-sub="${sub}"]`).value,
+      pb: document.querySelector(`.m-pb[data-sub="${sub}"]`).value,
+      port: document.querySelector(`.m-port[data-sub="${sub}"]`).value,
+      ma: document.querySelector(`.m-ma[data-sub="${sub}"]`).value,
+      pt: document.querySelector(`.m-pt[data-sub="${sub}"]`).value,
+      t1: document.querySelector(`.m-t1[data-sub="${sub}"]`).value,
+      t1term1: document.querySelector(`.m-t1term1[data-sub="${sub}"]`) ? document.querySelector(`.m-t1term1[data-sub="${sub}"]`).value : 0,
+      mlPt: document.querySelector(`.ml-pt[data-sub="${sub}"]`).checked,
+      odPt: document.querySelector(`.od-pt[data-sub="${sub}"]`).checked,
+      absentPt: document.querySelector(`.absent-pt[data-sub="${sub}"]`).checked,
+      mlT1: document.querySelector(`.ml-t1[data-sub="${sub}"]`).checked,
+      odT1: document.querySelector(`.od-t1[data-sub="${sub}"]`).checked,
+      absentT1: document.querySelector(`.absent-t1[data-sub="${sub}"]`).checked,
+      mlT1Term1: document.querySelector(`.ml-t1term1[data-sub="${sub}"]`) ? document.querySelector(`.ml-t1term1[data-sub="${sub}"]`).checked : false,
+      odT1Term1: document.querySelector(`.od-t1term1[data-sub="${sub}"]`) ? document.querySelector(`.od-t1term1[data-sub="${sub}"]`).checked : false,
+      absentT1Term1: document.querySelector(`.absent-t1term1[data-sub="${sub}"]`) ? document.querySelector(`.absent-t1term1[data-sub="${sub}"]`).checked : false
+    };
+  });
+  const coData = {};
+  document.querySelectorAll('.co-grade').forEach(input => {
+    coData[input.getAttribute('data-activity')] = input.value;
+  });
+
+  const payload = {
+    reportType: document.getElementById('reportTypeTerm2').checked ? 'Term2' : 'Term1',
+    annualYear: document.getElementById('annualYearInput').value,
+    name: document.getElementById('studentName').value,
+    father: document.getElementById('fatherName').value,
+    mother: document.getElementById('motherName').value,
+    roll: document.getElementById('rollNo').value,
+    admn: admn,
+    classSection: document.getElementById('classSection').value,
+    dob: document.getElementById('dob').value,
+    session: currentBatch,
+    attendancePct: document.getElementById('attendancePct').value,
+    reportDate: document.getElementById('reportDate').value,
+    remarks: document.getElementById('remarksInput').value,
+    marks: marksData,
+    coScholastic: coData
+  };
+
+  const localStore = JSON.parse(localStorage.getItem(`singhs_class_store_${currentBatch}`) || '{}');
+  localStore[admn] = payload;
+  localStorage.setItem(`singhs_class_store_${currentBatch}`, JSON.stringify(localStore));
+
+  const notice = document.getElementById('saveNotice');
+  notice.classList.remove('hidden');
+  setTimeout(() => notice.classList.add('hidden'), 2000);
+}
+
+function loadStudentDataIntoForm(data) {
+  if (data.reportType === 'Term2') {
+    document.getElementById('reportTypeTerm2').checked = true;
+  } else {
+    document.getElementById('reportTypeTerm1').checked = true;
+  }
+  document.getElementById('annualYearInput').value = data.annualYear || currentBatch;
+  document.getElementById('studentName').value = data.name || '';
+  document.getElementById('fatherName').value = data.father || '';
+  document.getElementById('motherName').value = data.mother || '';
+  document.getElementById('rollNo').value = data.roll || '';
+  document.getElementById('admissionNo').value = data.admn || '';
+  document.getElementById('classSection').value = data.classSection || '';
+  document.getElementById('dob').value = data.dob || '';
+  document.getElementById('academicSession').value = data.session || currentBatch;
+  document.getElementById('attendancePct').value = data.attendancePct || '0%';
+  document.getElementById('reportDate').value = data.reportDate || '';
+  document.getElementById('remarksInput').value = data.remarks || '';
+
+  if (data.marks) {
+    subjects.forEach(sub => {
+      if (data.marks[sub]) {
+        const m = data.marks[sub];
+        document.querySelector(`.m-att[data-sub="${sub}"]`).value = m.att;
+        document.querySelector(`.m-se[data-sub="${sub}"]`).value = m.se;
+        document.querySelector(`.m-pb[data-sub="${sub}"]`).value = m.pb;
+        document.querySelector(`.m-port[data-sub="${sub}"]`).value = m.port;
+        document.querySelector(`.m-ma[data-sub="${sub}"]`).value = m.ma;
+        
+        const ptEl = document.querySelector(`.m-pt[data-sub="${sub}"]`);
+        ptEl.value = m.pt;
+        const t1El = document.querySelector(`.m-t1[data-sub="${sub}"]`);
+        t1El.value = m.t1;
+        const t1Term1El = document.querySelector(`.m-t1term1[data-sub="${sub}"]`);
+        if (t1Term1El) t1Term1El.value = m.t1term1 || 0;
+        
+        const mlPtEl = document.querySelector(`.ml-pt[data-sub="${sub}"]`);
+        const odPtEl = document.querySelector(`.od-pt[data-sub="${sub}"]`);
+        const absentPtEl = document.querySelector(`.absent-pt[data-sub="${sub}"]`);
+        mlPtEl.checked = !!m.mlPt;
+        odPtEl.checked = !!m.odPt;
+        if (absentPtEl) absentPtEl.checked = !!m.absentPt;
+        if (mlPtEl.checked || odPtEl.checked || (absentPtEl && absentPtEl.checked)) ptEl.disabled = true;
+        else ptEl.disabled = false;
+
+        const mlT1El = document.querySelector(`.ml-t1[data-sub="${sub}"]`);
+        const odT1El = document.querySelector(`.od-t1[data-sub="${sub}"]`);
+        const absentT1El = document.querySelector(`.absent-t1[data-sub="${sub}"]`);
+        mlT1El.checked = !!m.mlT1;
+        odT1El.checked = !!m.odT1;
+        if (absentT1El) absentT1El.checked = !!m.absentT1;
+        if (mlT1El.checked || odT1El.checked || (absentT1El && absentT1El.checked)) t1El.disabled = true;
+        else t1El.disabled = false;
+
+        const mlT1Term1El = document.querySelector(`.ml-t1term1[data-sub="${sub}"]`);
+        const odT1Term1El = document.querySelector(`.od-t1term1[data-sub="${sub}"]`);
+        const absentT1Term1El = document.querySelector(`.absent-t1term1[data-sub="${sub}"]`);
+        if (mlT1Term1El && odT1Term1El) {
+          mlT1Term1El.checked = !!m.mlT1Term1;
+          odT1Term1El.checked = !!m.odT1Term1;
+          if (absentT1Term1El) absentT1Term1El.checked = !!m.absentT1Term1;
+          if (mlT1Term1El.checked || odT1Term1El.checked || (absentT1Term1El && absentT1Term1El.checked)) t1Term1El.disabled = true;
+          else t1Term1El.disabled = false;
+        }
+      }
+    });
+  }
+  if (data.coScholastic) {
+    document.querySelectorAll('.co-grade').forEach(input => {
+      const act = input.getAttribute('data-activity');
+      if (data.coScholastic[act]) input.value = data.coScholastic[act];
+    });
+  }
+}
+
+function generatePDF() {
+  const element = document.getElementById('pdf-preview');
+  const name = document.getElementById('studentName').value || 'ReportCard';
+  html2pdf().set({
+    margin: 0,
+    filename: `${name}_Progress_Report_${currentBatch}.pdf`,
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 4, useCORS: true, windowWidth: 794 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(element).save();
+}
+
+async function generateAllPDFs() {
+  const btn = document.getElementById('btnDownloadAll');
+  const originalText = btn.innerHTML;
+  btn.innerText = "Generating Ultra HD All...";
+  btn.disabled = true;
+
+  const cls = document.getElementById('classSelector').value;
+  const studentsMap = getStoredStudents();
+  const classStudents = studentsMap[cls] || [];
+  const activeIdx = document.getElementById('studentRoster').value;
+
+  const overlay = document.createElement('div');
+  overlay.style.position = 'fixed';
+  overlay.style.inset = '0';
+  overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.98)';
+  overlay.style.zIndex = '99999';
+  overlay.style.overflowY = 'auto';
+  overlay.innerHTML = `
+    <div id="statusHeader" style="position: sticky; top: 0; background: #1e3a8a; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+      Processing High-Resolution Student Report Cards for ${cls} (${currentBatch})... Please wait.
+    </div>
+    <div id="bulkContainer" style="width: 210mm; margin: 0 auto; background: white;"></div>
+  `;
+  document.body.appendChild(overlay);
+
+  const bulkContainer = overlay.querySelector('#bulkContainer');
+  const statusHeader = overlay.querySelector('#statusHeader');
+  const previewElement = document.getElementById('pdf-preview');
+
+  for (let i = 0; i < classStudents.length; i++) {
+    statusHeader.innerText = `Building HD Report Card ${i + 1} of ${classStudents.length} (${classStudents[i].name})...`;
+    document.getElementById('studentRoster').value = i;
+    onStudentSelectChange();
+    await new Promise(res => setTimeout(res, 60));
+    const clone = previewElement.cloneNode(true);
+    clone.id = `card-clone-${i}`;
+    if (i < classStudents.length - 1) {
+      clone.classList.add('page-break');
+    }
+    bulkContainer.appendChild(clone);
+  }
+
+  document.getElementById('studentRoster').value = activeIdx;
+  onStudentSelectChange();
+  statusHeader.innerText = "Compiling into single high-resolution PDF... Downloading shortly...";
+
+  const opt = {
+    margin: 0,
+    filename: `Class_${cls.replace(/\s+/g, '_')}_All_Report_Cards_${currentBatch}.pdf`,
+    image: { type: 'png', quality: 1.0 },
+    html2canvas: { scale: 3, useCORS: true, windowWidth: 794, scrollY: 0 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+
+  try {
+    await html2pdf().set(opt).from(bulkContainer).save();
+  } catch (err) {
+    console.error("Bulk Export Error:", err);
+  } finally {
+    document.body.removeChild(overlay);
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
+
+// ==================== MASTER GRID LOGIC ====================
+function initMasterSubjectDropdown() {
+  const select = document.getElementById('masterSubjectSelect');
+  select.innerHTML = '';
+  const allowedSubs = (currentUser && currentUser.role === 'teacher') ? (currentUser.subjects || []) : subjects;
+  allowedSubs.forEach(sub => {
+    const opt = document.createElement('option');
+    opt.value = sub;
+    opt.innerText = sub;
+    select.appendChild(opt);
+  });
+}
+
+function renderMasterGrid() {
+  const selectedSubject = document.getElementById('masterSubjectSelect').value;
+  const isTerm2 = document.getElementById('reportTypeTerm2').checked;
+  const cls = document.getElementById('classSelector').value;
+  const studentsMap = getStoredStudents();
+  const classStudents = studentsMap[cls] || [];
+  const tbody = document.getElementById('masterGridBody');
+  const headerRow = document.getElementById('masterGridHeaderRow');
+  tbody.innerHTML = '';
+
+  const isEditable = currentUser && (currentUser.role === 'owner' || currentUser.ctClass === cls || (currentUser.allottedClasses || []).includes(cls) && (currentUser.subjects || []).includes(selectedSubject));
+
+  if (isTerm2) {
+    headerRow.innerHTML = `
+      <th class="border px-3 py-2">Roll No</th>
+      <th class="border px-3 py-2">Admission No</th>
+      <th class="border px-3 py-2">Student Name</th>
+      <th class="border px-3 py-2 text-center">Attendance (5)</th>
+      <th class="border px-3 py-2 text-center">Sub Enrich (5)</th>
+      <th class="border px-3 py-2 text-center">Project (5)</th>
+      <th class="border px-3 py-2 text-center">Portfolio (5)</th>
+      <th class="border px-3 py-2 text-center">Multi Assess (5)</th>
+      <th class="border px-3 py-2 text-center">P.T (Out of 40)</th>
+      <th class="border px-3 py-2 text-center">Term 1 Marks (Out of 80)</th>
+      <th class="border px-3 py-2 text-center">Term Exam 2 (Out of 80)</th>
+      <th class="border px-3 py-2 text-center font-bold bg-blue-100">Subject Total</th>
+      <th class="border px-3 py-2 text-center font-bold bg-blue-100">Grade</th>
+    `;
+  } else {
+    headerRow.innerHTML = `
+      <th class="border px-3 py-2">Roll No</th>
+      <th class="border px-3 py-2">Admission No</th>
+      <th class="border px-3 py-2">Student Name</th>
+      <th class="border px-3 py-2 text-center">Attendance (5)</th>
+      <th class="border px-3 py-2 text-center">Sub Enrich (5)</th>
+      <th class="border px-3 py-2 text-center">Project (5)</th>
+      <th class="border px-3 py-2 text-center">Portfolio (5)</th>
+      <th class="border px-3 py-2 text-center">Multi Assess (5)</th>
+      <th class="border px-3 py-2 text-center">P.T (Out of 40)</th>
+      <th class="border px-3 py-2 text-center">Term Exam (Out of 80)</th>
+      <th class="border px-3 py-2 text-center font-bold bg-blue-100">Subject Total</th>
+      <th class="border px-3 py-2 text-center font-bold bg-blue-100">Grade</th>
+    `;
+  }
+
+  const localStore = JSON.parse(localStorage.getItem(`singhs_class_store_${currentBatch}`) || '{}');
+  
+  let sumAtt = 0, sumSe = 0, sumPb = 0, sumPort = 0, sumMa = 0, sumPt = 0, sumTerm1 = 0, sumTerm2 = 0, sumTotalMarks = 0, count = 0;
+
+  classStudents.forEach((st) => {
+    const studentData = localStore[st.admn] || {};
+    const sd = studentData.marks && studentData.marks[selectedSubject] ? studentData.marks[selectedSubject] : { att:0, se:0, pb:0, port:0, ma:0, pt:0, t1:0, t1term1:0 };
+
+    const att = effectiveComponentMark(sd.att, 'att').mark;
+    const se = effectiveComponentMark(sd.se, 'se').mark;
+    const pb = effectiveComponentMark(sd.pb, 'pb').mark;
+    const port = effectiveComponentMark(sd.port, 'port').mark;
+    const ma = effectiveComponentMark(sd.ma, 'ma').mark;
+    const ptRaw = parseFloat(sd.pt) || 0;
+    const termRaw = parseFloat(sd.t1) || 0;
+    const term1Raw = parseFloat(sd.t1term1) || 0;
+
+    const ptVal = Math.round((ptRaw / 40) * 5);
+    let termVal = 0;
+    let term1Val = 0;
+
+    if (!isTerm2) {
+      termVal = Math.round((termRaw / 80) * 70);
+    } else {
+      termVal = Math.round((termRaw / 80) * 50);
+      term1Val = Math.round((term1Raw / 80) * 20);
+    }
+
+    const subTotal = att + se + pb + port + ma + ptVal + termVal + term1Val;
+
+    sumAtt += att; sumSe += se; sumPb += pb; sumPort += port; sumMa += ma; sumPt += ptRaw; 
+    if (isTerm2) { sumTerm1 += term1Raw; sumTerm2 += termRaw; } else { sumTerm2 += termRaw; }
+    sumTotalMarks += subTotal;
+    count++;
+
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-gray-50';
+
+    const disabledAttr = !isEditable ? 'disabled' : '';
+
+    if (!isTerm2) {
+      tr.innerHTML = `
+        <td class="border px-3 py-1.5">${st.roll}</td>
+        <td class="border px-3 py-1.5 font-medium">${st.admn}</td>
+        <td class="border px-3 py-1.5">${st.name}</td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${att}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="att" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${se}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="se" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${pb}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="pb" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${port}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="port" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${ma}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="ma" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${ptRaw}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="pt" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${termRaw}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="t1" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center font-bold bg-blue-50">${subTotal}</td>
+        <td class="border px-3 py-1.5 text-center font-bold bg-blue-50">${getGrade(subTotal)}</td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td class="border px-3 py-1.5">${st.roll}</td>
+        <td class="border px-3 py-1.5 font-medium">${st.admn}</td>
+        <td class="border px-3 py-1.5">${st.name}</td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${att}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="att" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${se}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="se" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${pb}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="pb" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${port}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="port" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${ma}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="ma" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${ptRaw}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="pt" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${term1Raw}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="t1term1" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center"><input type="number" ${disabledAttr} value="${termRaw}" class="w-14 text-center border rounded py-0.5" data-admn="${st.admn}" data-sub="${selectedSubject}" data-field="t1" onchange="updateMasterValue(this)"></td>
+        <td class="border px-3 py-1.5 text-center font-bold bg-blue-50">${subTotal}</td>
+        <td class="border px-3 py-1.5 text-center font-bold bg-blue-50">${getGrade(subTotal)}</td>
+      `;
+    }
+    tbody.appendChild(tr);
+  });
+
+  if (count > 0) {
+    if (!isTerm2) {
+      document.getElementById('masterGridFooter').innerHTML = `
+        <td colspan="3" class="border px-3 py-2 text-right uppercase text-xs">Class Average:</td>
+        <td class="border px-3 py-2 text-center">${(sumAtt / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumSe / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumPb / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumPort / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumMa / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumPt / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumTerm2 / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center bg-blue-100 text-blue-900">${(sumTotalMarks / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">-</td>
+      `;
+    } else {
+      document.getElementById('masterGridFooter').innerHTML = `
+        <td colspan="3" class="border px-3 py-2 text-right uppercase text-xs">Class Average:</td>
+        <td class="border px-3 py-2 text-center">${(sumAtt / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumSe / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumPb / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumPort / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumMa / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumPt / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumTerm1 / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">${(sumTerm2 / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center bg-blue-100 text-blue-900">${(sumTotalMarks / count).toFixed(1)}</td>
+        <td class="border px-3 py-2 text-center">-</td>
+      `;
+    }
+  }
+}
+
+function updateMasterValue(input) {
+  const admn = input.getAttribute('data-admn');
+  const sub = input.getAttribute('data-sub');
+  const field = input.getAttribute('data-field');
+  const val = parseFloat(input.value) || 0;
+
+  const localStore = JSON.parse(localStorage.getItem(`singhs_class_store_${currentBatch}`) || '{}');
+  if (!localStore[admn]) {
+    const cls = document.getElementById('classSelector').value;
+    const studentsMap = getStoredStudents();
+    const stObj = (studentsMap[cls] || []).find(s => s.admn == admn);
+    localStore[admn] = {
+      name: stObj ? stObj.name : '',
+      father: stObj ? stObj.father : '',
+      mother: stObj ? stObj.mother : '',
+      roll: stObj ? stObj.roll : '',
+      admn: admn,
+      classSection: cls,
+      marks: {}
+    };
+  }
+  if (!localStore[admn].marks) localStore[admn].marks = {};
+  if (!localStore[admn].marks[sub]) localStore[admn].marks[sub] = { att:0, se:0, pb:0, port:0, ma:0, pt:0, t1:0, t1term1:0 };
+  
+  localStore[admn].marks[sub][field] = val;
+  localStorage.setItem(`singhs_class_store_${currentBatch}`, JSON.stringify(localStore));
+  renderMasterGrid();
+}
+
+function exportMasterGridToExcel() {
+  const selectedSubject = document.getElementById('masterSubjectSelect').value;
+  const cls = document.getElementById('classSelector').value;
+  const table = document.getElementById('masterGridTable');
+  const cloneTable = table.cloneNode(true);
+  
+  cloneTable.querySelectorAll('input').forEach(input => {
+    input.parentElement.innerText = input.value;
+  });
+
+  const wb = XLSX.utils.table_to_book(cloneTable, { sheet: selectedSubject });
+  const ws = wb.Sheets[selectedSubject];
+  ws['!cols'] = [
+    { wch: 8 },  { wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 },
+    { wch: 16 }, { wch: 14 }, { wch: 10 }
+  ];
+
+  XLSX.writeFile(wb, `Master_Grid_${cls.replace(/\s+/g, '_')}_${selectedSubject.replace(/\s+/g, '_')}_${currentBatch}.xlsx`);
+}
+
+// Reliable login submission: bind directly rather than relying on inline HTML handlers.
+document.addEventListener('DOMContentLoaded', function () {
+  const loginForm = document.getElementById('loginForm');
+  if (!loginForm) return;
+  loginForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    const errorDiv = document.getElementById('loginError');
+    try {
+      if (typeof handleLogin !== 'function') {
+        throw new Error('Login function is unavailable.');
+      }
+      handleLogin();
+    } catch (err) {
+      console.error('Login failed:', err);
+      if (errorDiv) {
+        errorDiv.innerText = 'Login could not complete. Please close and reopen this HTML file, then try again.';
+        errorDiv.classList.remove('hidden');
+      }
+    }
+  });
+});
+
+window.onload = function() {
+  initGlobalBatchSelector();
+  renderSubjectInputs();
+  initClassDropdowns();
+  refreshManagementDropdowns();
+  renderAssessmentSettings();
+  document.querySelectorAll('#erpForm input, #erpForm select').forEach(el => {
+    if (!el.dataset.autosaveBound) {
+      el.dataset.autosaveBound = '1';
+      el.addEventListener('change', () => { updatePreview(); scheduleAutoSave(); });
+    }
+  });
+};
+</script>
+</body>
+</html>
